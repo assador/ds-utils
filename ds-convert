@@ -63,7 +63,7 @@ $opts{e} = [split(/\s*,\s*/, $opts{e})];
 @templates = @ARGV ? @ARGV : ('./colors_templated.cot');
 foreach(@templates) {
 	my $fullname = decode("UTF-8", File::Spec->rel2abs($_));
-	if(-f && -s && $_ =~ /\.cot$/) {
+	if(-f && -s) {
 		open(IN, "<:encoding(UTF-8)", $fullname) or die "Can’t open $fullname: $!\n";
 		while(local $_ = <IN>) {
 			$_ =~ /^(.+?)\s*\t+(.+?)\s*\t+\s*\'?\s*(.+?)\s*\'?\s*$/;
