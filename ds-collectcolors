@@ -1,0 +1,130 @@
+#!/usr/bin/perl
+#
+#  ds-collectcolors, v1.0, CLI
+#  Copyright © 2016 Dmitry Sokolov
+#
+#  This program is free software: you can redistribute it and/or modify
+#  it under the terms of the GNU General Public License as published by
+#  the Free Software Foundation, either version 3 of the License, or
+#  (at your option) any later version.
+#
+#  This program is distributed in the hope that it will be useful,
+#  but WITHOUT ANY WARRANTY; without even the implied warranty of
+#  MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+#  GNU General Public License for more details.
+#
+#  You should have received a copy of the GNU General Public License
+#  along with this program.  If not, see <http://www.gnu.org/licenses/>.
+#
+#  Скрипт ищет в указанных файлах или каталогах цвета по указанным регулярным
+#  выражениям, для каждого найденного запоминает количество его упоминаний,
+#  позицию, оригинальную нотацию, конвертирует в тройку десятичных значений RGB
+#  и сохраняет всё это в палитру GIMP и шаблон замены для ds-convert, схлопывая
+#  до уникальных и сортируя по количеству упоминаний от большего к меньшему.
+#  Подробнее: http://sokolov.website/programs/ds-utils/ds-collectcolors
+#
+#  Зависимости: perl
+#  Рекомендуется: enca
+#
+#  ds-collectcolors [-r] [-e кодировка] [-o файл_найденного] [-t файл_шаблона]
+#                   [-m регвыр] [файл(-ы)] [путь(-и)]
+#
+#  -r  — от recursive  — анализировать рекурсивно (по умолчанию — нет)
+#  -e  — от encoding   — кодировка читаемых файлов
+#                        (по умолчанию — * — автоопределение с помощью enca)
+#  -o  — от output     — создаваемый файл палитры GIMP с найденными цветами
+#  -t  — от template   — создаваемый файл шаблона замены цветов с найденными
+#                        цветами для последующей их замены скриптом ds-convert
+#  -m  — от mask       — регулярное выражение имени файла, без пути
+#                        (по умолчанию соответствует любому имени)
+#  файл(-ы)/путь(-и)   — по умолчанию — .
+#
+#  Пример: ds-collectcolors -r -e CP1251 -o /tmp/colors.gpl -t /tmp/change.txt \
+#                           -m '.*\.(?:css|html)' /var/www ~/onemore.css
+#
+#  Dmitry Sokolov <dmitry@scrofa-tridens.ru>
+
+use strict;
+use warnings;
+use utf8;
+use open qw/:encoding(UTF-8) :std/;
+use POSIX;
+use File::Spec;
+use File::Find;
+use Getopt::Std;
+use Encode;
+
+my (@result, @dirs, $opte, %opts, $mask);
+my ($inner, $output, $template) = (0, "GIMP Palette\nName: colors_collected.gpl\nColumns: 0\n#\n", "");
+my @sample = (
+	'(?<!&)#([0-9a-fA-F]{6})(?![0-9a-fA-F])',
+	'(?<!&)#([0-9a-fA-F]{3})(?![0-9a-fA-F])',
+	'\brgba?\((.*?)\)',
+);
+
+sub collect_in_file {
+	my $file = shift;
+	my $source = undef;
+	if($opts{e} eq '*') {$opte = `enca -r '$file'` || "UTF-8"; chomp $opte;} else {$opte = $opts{e};}
+	open(IN, "<:encoding($opte)", $file) or die "Can’t open $file: $!\n";
+	while($_ = <IN>) {$source .= $_;}
+	close(IN);
+	for(my $i = 0; $i < scalar @sample; $i++) {
+		my $s = $sample[$i];
+		$s =~ s/\\(\d+)/'\\'.($1+1)/ge;
+		while($source =~ m/($s)/g) {
+			for(my $y = 0; $y <= scalar @result; $y++) {
+				if(scalar @result == 0 || ($y == $#result && $1 ne $result[$y]->{orig})) {
+					my $val = $2;
+					if($i == 1) {$val =~ s/(.)/$1$1/g;}
+					if($i == 0 || $i == 1) {$val = join("\t", map $_, unpack "C*", pack "H*", $val);}
+					if($i == 2) {$val = join("\t", $val =~ /^\D*(\d+)\D+(\d+)\D+(\d+)/g);}
+					$result[++$#result] = {orig => $1, conv => $val, pths => [$file], wght => 1};
+					last;
+				}
+				if(scalar @result != 0 && $1 eq $result[$y]->{orig}) {
+					$result[$y]->{wght}++;
+					$result[$y]->{pths}->[++$#{$result[$y]->{pths}}] = $file unless $file ~~ @{$result[$y]->{pths}};
+					last;
+				}
+			}
+		}
+	}
+}
+
+sub wanted {
+	if(!$inner) {$inner = 1; return;}
+	$File::Find::prune = 1 if !$File::Find::prune && !(exists $opts{r});
+	if(-f && -s && $_ =~ $mask) {&collect_in_file($File::Find::name);}
+}
+
+getopts('re:o:t:m:', \%opts);
+$opts{e} = '*' unless exists $opts{e};
+$opts{o} = './colors_collected.gpl' unless exists $opts{o};
+$opts{t} = './colors_templated.cot' unless exists $opts{t};
+$mask = exists $opts{m} ? qr/$opts{m}/ : qr/.+/;
+@dirs = @ARGV ? @ARGV : ('.');
+foreach(@dirs) {
+	my $fullname = decode("UTF-8", File::Spec->rel2abs($_));
+	if(-f && -s && $_ =~ $mask) {&collect_in_file($fullname);} else {$inner = 0; find(\&wanted, $fullname);}
+}
+foreach(sort {$b->{wght} <=> $a->{wght}} @result) {
+	$output .=
+		$_->{conv} . "\t\t" .
+		"weight  " . $_->{wght} . " " x (5 - length $_->{wght}) .
+		"of original  " . $_->{orig} . " " x (28 - length $_->{orig}) .
+		"at  '" . join("', '", @{$_->{pths}}) . "'" .
+		"\n";
+	$template .=
+		$_->{orig} . " " x (25 - length $_->{orig}) . "\t" .
+		$_->{orig} . " " x (25 - length $_->{orig}) . "\t" .
+		"'" . join("', '", @{$_->{pths}}) . "'" .
+		"\n";
+}
+open(OUT, ">:encoding(UTF-8)", $opts{o}) or die "Can’t create $opts{o}: $!\n";
+print OUT $output;
+close(OUT);
+open(OUT, ">:encoding(UTF-8)", $opts{t}) or die "Can’t create $opts{t}: $!\n";
+print OUT $template;
+close(OUT);
+exit 0;
