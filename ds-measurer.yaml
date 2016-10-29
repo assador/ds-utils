@@ -1,0 +1,44 @@
+screenshot:
+   target: both
+   format: png
+   file:   /media/data/Temp/screenshot_%Y_%m_%d_%H_%M_%S.png
+shortcuts:
+   quit:            Escape
+   fixed ratio:     Shift_L
+   from center:     Control_L
+   screenshot:      s
+   segment line:    z
+   center lines:    x
+   golden sections: c
+aspect ratio shortcuts:
+   1:       q
+   4/3:     w
+   1/0.618: e
+   3/2:     r
+   16/9:    t
+colors shortcuts:
+   default: 1
+   dark:    2
+   light:   3
+colors:
+   default:
+      main:       { r: 0,    g: 0.5,  b: 1,    a: 0.5  }
+      basic:      { r: 0,    g: 0,    b: 0,    a: 0.25 }
+      faded:      { r: 0,    g: 0,    b: 0,    a: 0.15 }
+      text main:  { r: 0,    g: 0.5,  b: 1,    a: 0.6  }
+      text basic: { r: 0,    g: 0,    b: 0,    a: 0.75 }
+      text faded: { r: 0,    g: 0,    b: 0,    a: 0.4  }
+   dark:
+      main:       { r: 0,    g: 0,    b: 0,    a: 1    }
+      basic:      { r: 0,    g: 0,    b: 0,    a: 1    }
+      faded:      { r: 0,    g: 0,    b: 0,    a: 1    }
+      text main:  { r: 0,    g: 0,    b: 0,    a: 1    }
+      text basic: { r: 0,    g: 0,    b: 0,    a: 1    }
+      text faded: { r: 0,    g: 0,    b: 0,    a: 1    }
+   light:
+      main:       { r: 1,    g: 1,    b: 1,    a: 1    }
+      basic:      { r: 1,    g: 1,    b: 1,    a: 1    }
+      faded:      { r: 1,    g: 1,    b: 1,    a: 1    }
+      text main:  { r: 1,    g: 1,    b: 1,    a: 1    }
+      text basic: { r: 1,    g: 1,    b: 1,    a: 1    }
+      text faded: { r: 1,    g: 1,    b: 1,    a: 1    }
