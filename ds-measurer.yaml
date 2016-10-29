@@ -1,7 +1,7 @@
 screenshot:
    target: both
    format: png
-   file:   /media/data/Temp/screenshot_%Y_%m_%d_%H_%M_%S.png
+   file:   ~/screenshot_%Y_%m_%d_%H_%M_%S.png
 shortcuts:
    quit:            Escape
    fixed ratio:     Shift_L

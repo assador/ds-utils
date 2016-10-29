@@ -50,7 +50,12 @@ use YAML;
 use File::Basename;
 use constant PI => 4 * atan2(1, 1);
 
-my $config = YAML::LoadFile(dirname(__FILE__) . "/ds-measurer.yaml");
+my @cpaths = ($ENV{"HOME"} . "/.config/ds-measurer.yaml", dirname(__FILE__) . "/ds-measurer.yaml");
+my $config = 0;
+foreach(@cpaths) {if(-s && -f) {$config = YAML::LoadFile($_); last;}}
+die "No configuration file found at:\n" . join("\n", @cpaths) . "\n" if !$config;
+$config->{"screenshot"}->{"file"} =~ s/^~/$ENV{"HOME"}/;
+
 my (@c, $cb, $cc, $state, $x0, $y0, $x1, $y1, $x0c, $y0c, $x1c, $y1c, $w, $h, $l, $a, $xr, $yr, $wr, $hr, $lr, $ar, $xt, $yt);
 my @g = (0, 1, 0);
 my $sf = 0; my $arm = 1;
@@ -111,7 +116,7 @@ sub key_release {
 	my (undef, $event) = @_;
 	if($event->hardware_keycode == key_n2c($config->{"shortcuts"}->{"fixed ratio"}) || $event->hardware_keycode == key_n2c($config->{"shortcuts"}->{"from center"})) {&draw(undef, $event);} # Отмена выделения равностороннего и из центра
 	if($event->hardware_keycode == key_n2c($config->{"shortcuts"}->{"quit"})) {exit 0;} # Выход
-	if($event->hardware_keycode == key_n2c($config->{"shortcuts"}->{"screenshot"}) && $state >= "button1-mask") {$sf = 1; &clear; Glib::Timeout->add(50, sub {&screenshot($x0c, $y0c, $w, $h); Glib::Timeout->add(50, sub {$sf = 0; &draw(undef, undef); return 0;}); return 0;});} # Скриншот
+	if($event->hardware_keycode == key_n2c($config->{"shortcuts"}->{"screenshot"}) && $state >= "button1-mask") {$sf = 1; &clear; Glib::Timeout->add(100, sub {&screenshot($x0c, $y0c, $w, $h); $sf = 0; &draw(undef, undef); return 0;});} # Скриншот
 	if($event->hardware_keycode == key_n2c($config->{"shortcuts"}->{"segment line"})) {$g[0] = !$g[0]; &draw(undef, $event);} # Основной отрезок
 	if($event->hardware_keycode == key_n2c($config->{"shortcuts"}->{"center lines"})) {$g[1] = !$g[1]; &draw(undef, $event);} # Линии по центру
 	if($event->hardware_keycode == key_n2c($config->{"shortcuts"}->{"golden sections"})) {$g[2] = !$g[2]; &draw(undef, $event);} # Золотое сечение
@@ -123,8 +128,12 @@ sub screenshot {
 	my ($xs, $ys, $ws, $hs) = @_;
 	my $ss = Gtk2::Gdk::Pixbuf->new("rgb", 0, 8, $ws, $hs);
 	$ss->get_from_drawable(Gtk2::Gdk->get_default_root_window, Gtk2::Gdk::Colormap->get_system, $xs, $ys, 0, 0, $ws, $hs);
-	$ss->save(strftime($config->{"screenshot"}->{"file"}, localtime), $config->{"screenshot"}->{"format"}) if $config->{"screenshot"}->{"target"} eq "file" || $config->{"screenshot"}->{"target"} eq "both";
-	$cb->set_image($ss) if $config->{"screenshot"}->{"target"} eq "clipboard" || $config->{"screenshot"}->{"target"} eq "both";
+	if($config->{"screenshot"}->{"target"} eq "both" || $config->{"screenshot"}->{"target"} eq "file") {
+		eval {$ss->save(strftime($config->{"screenshot"}->{"file"}, localtime), $config->{"screenshot"}->{"format"});} or print $@;
+	}
+	if($config->{"screenshot"}->{"target"} eq "both" || $config->{"screenshot"}->{"target"} eq "clipboard") {
+		$cb->set_image($ss);
+	}
 	return 0;
 }
 sub button_press {
