@@ -1,0 +1,9 @@
+ds-utils is a pack of CLI/GTK+ Perl and Bash scripts, useful in web development
+and just in work in different desktop environments. Scripts were written to run
+under GNU/Linux, but most of them also might work in another operating systems,
+if all of the dependencies were satisfied, of course. However, it has not been
+tested enough. As it’s scripts with plain text inside, all brief descriptions
+are placed right to the start of each script file as comments.
+
+This is a free software published under GNU GPL v3 (see LICENSE file). For more
+information, however in Russian, see http://sokolov.website/programs/ds-utils
