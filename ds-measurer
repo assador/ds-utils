@@ -116,7 +116,7 @@ sub key_release {
 	my (undef, $event) = @_;
 	if($event->hardware_keycode == key_n2c($config->{"shortcuts"}->{"fixed ratio"}) || $event->hardware_keycode == key_n2c($config->{"shortcuts"}->{"from center"})) {&draw(undef, $event);} # Отмена выделения равностороннего и из центра
 	if($event->hardware_keycode == key_n2c($config->{"shortcuts"}->{"quit"})) {exit 0;} # Выход
-	if($event->hardware_keycode == key_n2c($config->{"shortcuts"}->{"screenshot"}) && $state >= "button1-mask") {$sf = 1; &clear; Glib::Timeout->add(100, sub {&screenshot($x0c, $y0c, $w, $h); $sf = 0; &draw(undef, undef); return 0;});} # Скриншот
+	if($event->hardware_keycode == key_n2c($config->{"shortcuts"}->{"screenshot"}) && $state >= "button1-mask") {$sf = 1; &clear; Glib::Timeout->add(100, sub {&screenshot(($x0c < $x1c ? $x0c : $x1c), ($y0c < $y1c ? $y0c : $y1c), $w, $h); $sf = 0; &draw(undef, undef); return 0;});} # Скриншот
 	if($event->hardware_keycode == key_n2c($config->{"shortcuts"}->{"segment line"})) {$g[0] = !$g[0]; &draw(undef, $event);} # Основной отрезок
 	if($event->hardware_keycode == key_n2c($config->{"shortcuts"}->{"center lines"})) {$g[1] = !$g[1]; &draw(undef, $event);} # Линии по центру
 	if($event->hardware_keycode == key_n2c($config->{"shortcuts"}->{"golden sections"})) {$g[2] = !$g[2]; &draw(undef, $event);} # Золотое сечение
