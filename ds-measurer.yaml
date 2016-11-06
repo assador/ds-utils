@@ -1,15 +1,21 @@
+common:
+   freeze: false
 screenshot:
    target: both
    format: png
    file:   ~/screenshot_%Y_%m_%d_%H_%M_%S.png
 shortcuts:
-   quit:            Escape
-   fixed ratio:     Shift_L
-   from center:     Control_L
-   screenshot:      s
-   segment line:    z
-   center lines:    x
-   golden sections: c
+   quit:             Escape
+   fixed ratio:      Shift_L
+   from center:      Control_L
+   screenshot:       s
+   segment line:     z
+   center lines:     x
+   golden sections:  c
+   freeze off:       d
+   freeze on:        f
+   freeze clear:     g
+   freeze clear all: j
 aspect ratio shortcuts:
    1:       q
    4/3:     w
