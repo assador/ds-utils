@@ -56,9 +56,9 @@ foreach(@cpaths) {if(-s && -f) {$config = YAML::LoadFile($_); last;}}
 die "No configuration file found at:\n" . join("\n", @cpaths) . "\n" if !$config;
 $config->{"screenshot"}->{"file"} =~ s/^~/$ENV{"HOME"}/;
 
-my (@c, $cb, @cs, @cc, $cr, $state, $x0, $y0, $x1, $y1, $x0c, $y0c, $x1c, $y1c, $w, $h, $l, $a, $xr, $yr, $wr, $hr, $lr, $ar, $xt, $yt);
+my (@colors, $cb, $cr, $state);
+my ($sf, $arm) = (0, 1);
 my @g = (0, 1, 0);
-my $sf = 0; my $arm = 1;
 my $freeze = $config->{"common"}->{"freeze"} eq "true" ? 1 : 0;
 &set_colors("default");
 
@@ -71,29 +71,34 @@ my $da = Gtk2::DrawingArea->new;
 $da->set_events([qw/exposure_mask leave-notify-mask button-press-mask button-release-mask pointer-motion-mask pointer-motion-hint-mask/]);
 $da->signal_connect(expose_event => \&expose);
 $da->signal_connect(button_press_event => \&button_press);
-$da->signal_connect(motion_notify_event => \&draw);
+$da->signal_connect(motion_notify_event => \&motion);
 $da->signal_connect(button_release_event => \&button_release);
 $window->add($da);
 $cb = Gtk2::Clipboard->get(Gtk2::Gdk->SELECTION_CLIPBOARD);
 $window->set_colormap($window->get_screen->get_rgba_colormap);
 $window->show_all;
 $da->window->set_cursor(Gtk2::Gdk::Cursor::new(undef, "blank-cursor"));
-&cscc("image"); &cscc(); &cscc();
+
+my %image = &cscc("image");
+my %c = &cscc();
+my @s = ({&cscc()});
+my $S = \$s[$#s];
+
 &cursor();
 Gtk2->main;
 
 sub set_colors {
 	my $ct = shift;
-	@c = ([$config->{"colors"}->{$ct}->{"main"}->{"r"}, $config->{"colors"}->{$ct}->{"main"}->{"g"}, $config->{"colors"}->{$ct}->{"main"}->{"b"}, $config->{"colors"}->{$ct}->{"main"}->{"a"}], [$config->{"colors"}->{$ct}->{"basic"}->{"r"}, $config->{"colors"}->{$ct}->{"basic"}->{"g"}, $config->{"colors"}->{$ct}->{"basic"}->{"b"}, $config->{"colors"}->{$ct}->{"basic"}->{"a"}], [$config->{"colors"}->{$ct}->{"faded"}->{"r"}, $config->{"colors"}->{$ct}->{"faded"}->{"g"}, $config->{"colors"}->{$ct}->{"faded"}->{"b"}, $config->{"colors"}->{$ct}->{"faded"}->{"a"}], [$config->{"colors"}->{$ct}->{"text main"}->{"r"}, $config->{"colors"}->{$ct}->{"text main"}->{"g"}, $config->{"colors"}->{$ct}->{"text main"}->{"b"}, $config->{"colors"}->{$ct}->{"text main"}->{"a"}], [$config->{"colors"}->{$ct}->{"text basic"}->{"r"}, $config->{"colors"}->{$ct}->{"text basic"}->{"g"}, $config->{"colors"}->{$ct}->{"text basic"}->{"b"}, $config->{"colors"}->{$ct}->{"text basic"}->{"a"}], [$config->{"colors"}->{$ct}->{"text faded"}->{"r"}, $config->{"colors"}->{$ct}->{"text faded"}->{"g"}, $config->{"colors"}->{$ct}->{"text faded"}->{"b"}, $config->{"colors"}->{$ct}->{"text faded"}->{"a"}]);
+	@colors = ([$config->{"colors"}->{$ct}->{"main"}->{"r"}, $config->{"colors"}->{$ct}->{"main"}->{"g"}, $config->{"colors"}->{$ct}->{"main"}->{"b"}, $config->{"colors"}->{$ct}->{"main"}->{"a"}], [$config->{"colors"}->{$ct}->{"basic"}->{"r"}, $config->{"colors"}->{$ct}->{"basic"}->{"g"}, $config->{"colors"}->{$ct}->{"basic"}->{"b"}, $config->{"colors"}->{$ct}->{"basic"}->{"a"}], [$config->{"colors"}->{$ct}->{"faded"}->{"r"}, $config->{"colors"}->{$ct}->{"faded"}->{"g"}, $config->{"colors"}->{$ct}->{"faded"}->{"b"}, $config->{"colors"}->{$ct}->{"faded"}->{"a"}], [$config->{"colors"}->{$ct}->{"text main"}->{"r"}, $config->{"colors"}->{$ct}->{"text main"}->{"g"}, $config->{"colors"}->{$ct}->{"text main"}->{"b"}, $config->{"colors"}->{$ct}->{"text main"}->{"a"}], [$config->{"colors"}->{$ct}->{"text basic"}->{"r"}, $config->{"colors"}->{$ct}->{"text basic"}->{"g"}, $config->{"colors"}->{$ct}->{"text basic"}->{"b"}, $config->{"colors"}->{$ct}->{"text basic"}->{"a"}], [$config->{"colors"}->{$ct}->{"text faded"}->{"r"}, $config->{"colors"}->{$ct}->{"text faded"}->{"g"}, $config->{"colors"}->{$ct}->{"text faded"}->{"b"}, $config->{"colors"}->{$ct}->{"text faded"}->{"a"}]);
 }
 sub expose {
-	&clear($cc[0]);
-	for(my $i = @cs - 1; $i > 0; $i--) {
-		$cc[0]->set_source_surface($cs[$i], 0, 0);
-		$cc[0]->paint;
+	&clear($image{context});
+	foreach(@s, {%c}) {
+		$image{context}->set_source_surface($_->{surface}, 0, 0);
+		$image{context}->paint;
 	}
 	($cr) = &clear();
-	$cr->set_source_surface($cs[0], 0, 0);
+	$cr->set_source_surface($image{surface}, 0, 0);
 	$cr->paint;
 }
 sub clear {
@@ -108,40 +113,42 @@ sub clear {
 }
 sub cscc {
 	my ($t, $w, $h) = ($_[0] || "recording", $_[1] || $window->get_screen->get_width, $_[2] || $window->get_screen->get_height);
-	if($t eq "image") {push @cs, Cairo::ImageSurface->create("argb32", $w, $h);}
-		else {push @cs, Cairo::RecordingSurface->create("color-alpha", undef);}
-	push @cc, Cairo::Context->create($cs[$#cs]);
-	$cc[$#cc]->set_line_width(1);
-	$cc[$#cc]->save;
+	my ($surface, $context);
+	if($t eq "image") {$surface = Cairo::ImageSurface->create("argb32", $w, $h);}
+		else {$surface = Cairo::RecordingSurface->create("color-alpha", undef);}
+	$context = Cairo::Context->create($surface);
+	$context->set_line_width(1);
+	$context->save;
+	return (surface => $surface, context => $context);
 }
 sub freeze {
-	&cscc();
-	$cc[$#cc]->set_source_surface($cs[2], 0, 0);
-	$cc[$#cc]->paint;
+	push @s, {&cscc()};
+	&calc(\$s[$#s], $$S->{x0}, $$S->{y0}, $$S->{x1}, $$S->{y1});
+	&draw(\$s[$#s]);
 }
 sub cursor {
-	(undef, $x1, $y1, $state) = $da->window->get_pointer; $x0c = $x0; $y0c = $y0; $x1c = $x1; $y1c = $y1;
-	$cc[1]->set_source_rgba($c[1][0], $c[1][1], $c[1][2], $c[1][3]);
-	$cc[1]->move_to($x1 + 0.5, 0); $cc[1]->line_to($x1 + 0.5, $window->get_screen->get_height); $cc[1]->stroke;
-	$cc[1]->move_to(0, $y1 + 0.5); $cc[1]->line_to($window->get_screen->get_width, $y1 + 0.5); $cc[1]->stroke;
+	(undef, $c{x1}, $c{y1}, $state) = $da->window->get_pointer;
+	$c{context}->set_source_rgba($colors[1][0], $colors[1][1], $colors[1][2], $colors[1][3]);
+	$c{context}->move_to($c{x1} + 0.5, 0); $c{context}->line_to($c{x1} + 0.5, $window->get_screen->get_height); $c{context}->stroke;
+	$c{context}->move_to(0, $c{y1} + 0.5); $c{context}->line_to($window->get_screen->get_width, $c{y1} + 0.5); $c{context}->stroke;
 }
 sub key_n2c {
 	return Gtk2::Gdk::Keymap->get_entries_for_keyval(Gtk2::Gdk->keyval_from_name(shift))->{"keycode"};
 }
 sub key_press {
-	my (undef, $event) = @_;
+	my ($widget, $event) = @_;
 	# Выделение равностороннее и из центра
 	if($event->hardware_keycode == key_n2c($config->{"shortcuts"}->{"fixed ratio"})
 	|| $event->hardware_keycode == key_n2c($config->{"shortcuts"}->{"from center"})) {
-		&draw;
+		&motion;
 	}
 }
 sub key_release {
-	my (undef, $event) = @_;
+	my ($widget, $event) = @_;
 	# Отмена выделения равностороннего и из центра
 	if($event->hardware_keycode == key_n2c($config->{"shortcuts"}->{"fixed ratio"})
 	|| $event->hardware_keycode == key_n2c($config->{"shortcuts"}->{"from center"})) {
-		&draw;
+		&motion;
 	}
 	# Выход
 	if($event->hardware_keycode == key_n2c($config->{"shortcuts"}->{"quit"})) {
@@ -157,14 +164,13 @@ sub key_release {
 	}
 	# Удаление последнего слоя заморозки
 	if($event->hardware_keycode == key_n2c($config->{"shortcuts"}->{"freeze clear"})) {
-		pop @cc if $#cc > 2;
-		pop @cs if $#cs > 2;
-		$da->queue_draw;
+		pop @s;
+		$widget->queue_draw;
 	}
 	# Удаление всех слоёв заморозки
 	if($event->hardware_keycode == key_n2c($config->{"shortcuts"}->{"freeze clear all"})) {
-		for(my $i = @cs - 1; $i > 2; $i--) {pop @cc; pop @cs;}
-		$da->queue_draw;
+		splice @s, -$#s;
+		$widget->queue_draw;
 	}
 	# Скриншот
 	if($event->hardware_keycode == key_n2c($config->{"shortcuts"}->{"screenshot"})
@@ -172,43 +178,44 @@ sub key_release {
 		$sf = 1;
 		&clear();
 		Glib::Timeout->add(100, sub {
-			&screenshot(($x0c < $x1c ? $x0c : $x1c + 1), ($y0c < $y1c ? $y0c : $y1c + 1), $w, $h);
+			&screenshot($S);
 			$sf = 0;
-			$da->queue_draw;
+			$widget->queue_draw;
 		});
 	}
 	# Основной отрезок
 	if($event->hardware_keycode == key_n2c($config->{"shortcuts"}->{"segment line"})) {
 		$g[0] = !$g[0];
-		&draw;
+		&motion;
 	}
 	# Линии по центру
 	if($event->hardware_keycode == key_n2c($config->{"shortcuts"}->{"center lines"})) {
 		$g[1] = !$g[1];
-		&draw;
+		&motion;
 	}
 	# Золотое сечение
 	if($event->hardware_keycode == key_n2c($config->{"shortcuts"}->{"golden sections"})) {
 		$g[2] = !$g[2];
-		&draw;
+		&motion;
 	}
 	# Цветовые схемы
 	while(my ($key, $value) = each %{$config->{"colors shortcuts"}}) {
 		if($event->hardware_keycode == key_n2c($value)) {
 			&set_colors($key);
-			&draw;
+			&motion;
 		}
 	}
 	# Соотношение сторон
 	while(my ($key, $value) = each %{$config->{"aspect ratio shortcuts"}}) {
 		if($event->hardware_keycode == key_n2c($value)) {
 			$arm = eval($key);
-			&draw;
+			&motion;
 		}
 	}
 }
 sub screenshot {
-	my ($xs, $ys, $ws, $hs) = @_;
+	my ($S) = @_;
+	my ($xs, $ys, $ws, $hs) = ($$S->{x0} < $$S->{x1} ? $$S->{x0} : $$S->{x1} + 1, $$S->{y0} < $$S->{y1} ? $$S->{y0} : $$S->{y1} + 1, $$S->{w}, $$S->{h});
 	my $ss = Gtk2::Gdk::Pixbuf->new("rgb", 0, 8, $ws, $hs);
 	$ss->get_from_drawable(Gtk2::Gdk->get_default_root_window, Gtk2::Gdk::Colormap->get_system, $xs, $ys, 0, 0, $ws, $hs);
 	if($config->{"screenshot"}->{"target"} eq "both"
@@ -222,137 +229,146 @@ sub screenshot {
 	}
 }
 sub button_press {
-	my (undef, $event) = @_;
+	my ($widget, $event) = @_;
 	if($event->button == 1) {
-		($x0, $y0) = $event->coords; $x0c = $x0; $y0c = $y0; $x1c = $x1; $y1c = $y1;
+		($c{x0}, $c{y0}) = $event->coords; $$S->{x0} = $c{x0}; $$S->{y0} = $c{y0}; $$S->{x1} = $c{x1}; $$S->{y1} = $c{y1};
 	}
 	if($event->button == 3 && $state >= "button1-mask") {
-		$cb->set_text("⤢ $w ⨯ $h | 𝄩 $lr | ⦟ $ar° | ⇱ ($x0c, $y0c) | ⇲ ($x1c, $y1c)");
+		$cb->set_text("⤢ $$S->{w} ⨯ $$S->{h} | 𝄩 $$S->{lr} | ⦟ $$S->{ar}° | ⇱ ($$S->{x0}, $$S->{y0}) | ⇲ ($$S->{x1}, $$S->{y1})");
 	}
 }
 sub button_release {
-	my (undef, $event) = @_;
+	my ($widget, $event) = @_;
 	if($event->button == 1) {
 		&freeze() if $freeze;
-		&clear($cc[1], $cc[2]);
+		&clear($c{context}, $$S->{context});
 		&cursor();
-		$da->queue_draw;
+		$widget->queue_draw;
 	}
 }
-sub draw {
+sub motion {
 	if(!$sf) {
 		my ($widget, $event) = @_;
 		if(!defined($event) || $event->type eq "motion-notify" && $event->is_hint || $event->type eq "key-press" || $event->type eq "key-release") {
-			&clear($cc[1], $cc[2]);
+			&clear($c{context}, $$S->{context});
 			if($state >= "button1-mask") {
-				(undef, $x1, $y1, $state) = $da->window->get_pointer; $x0c = $x0; $y0c = $y0; $x1c = $x1; $y1c = $y1;
-				# Выделение из центра
-				if($state >= "control-mask") {$x0c = $x0 * 2 - $x1; $y0c = $y0 * 2 - $y1;};
-				# Выделение равностороннее
-				if($state >= "shift-mask") {
-					if(abs $x1 - $x0 >= abs $y1 - $y0) {
-						$x1c = $x0 + round($arm * ($x1 - $x0 >= 0 ? (abs $y1 - $y0) : (0 - abs $y1 - $y0)));
-						$x0c = $x0 - round($arm * ($x1 - $x0 >= 0 ? (abs $y1 - $y0) : (0 - abs $y1 - $y0))) if $state >= "control-mask";
-					} else {
-						$y1c = $y0 + round($arm * ($y1 - $y0 >= 0 ? (abs $x1 - $x0) : (0 - abs $x1 - $x0)));
-						$y0c = $y0 - round($arm * ($y1 - $y0 >= 0 ? (abs $x1 - $x0) : (0 - abs $x1 - $x0))) if $state >= "control-mask";
-					}
-				};
-				# Расчёт ширины, высоты, длины, угла и значений для прорисовки
-				($w, $h) = (abs $x1c - $x0c, abs $y1c - $y0c);
-				($l, $a) = (($w ** 2 + $h ** 2) ** 0.5, atan2($h, $w));
-				($xr, $yr, $wr, $hr) = ($x0c + 0.5, $y0c + 0.5, $x1c - $x0c >= 0 ? ($x1c - $x0c - 1) : ($x1c - $x0c + 1), $y1c - $y0c >= 0 ? ($y1c - $y0c - 1) : ($y1c - $y0c + 1));
-				$lr = round($l); $ar = nearest(0.01, $a * 180 / PI); $ar =~ s/,/\./;
+				(undef, $c{x1}, $c{y1}, $state) = $widget->window->get_pointer;
+				&calc($S, $c{x0}, $c{y0}, $c{x1}, $c{y1}, $state);
 				# Курсор
-				$cc[1]->set_source_rgba($c[1][0], $c[1][1], $c[1][2], $c[1][3]);
-				$cc[1]->move_to($x1 - $x0 >= 0 ? ($x1 - 0.5) : ($x1 + 1.5), 0);
-				$cc[1]->line_to($x1 - $x0 >= 0 ? ($x1 - 0.5) : ($x1 + 1.5), $window->get_screen->get_height);
-				$cc[1]->stroke;
-				$cc[1]->move_to(0, $y1 - $y0 >= 0 ? ($y1 - 0.5) : ($y1 + 1.5));
-				$cc[1]->line_to($window->get_screen->get_width, $y1 - $y0 >= 0 ? ($y1 - 0.5) : ($y1 + 1.5));
-				$cc[1]->stroke;
-				# Угол
-				if($g[0] && $w > 25) {
-					$cc[2]->set_source_rgba($c[1][0], $c[1][1], $c[1][2], $c[1][3]);
-					$cc[2]->arc($xr, $yr, 25, 0, $a) if $x1c - $x0c >= 0 && $y1c - $y0c >= 0;
-					$cc[2]->arc($xr, $yr, 25, PI * 2 - $a, 0) if $x1c - $x0c >= 0 && $y1c - $y0c < 0;
-					$cc[2]->arc($xr, $yr, 25, PI, PI + $a) if $x1c - $x0c < 0 && $y1c - $y0c < 0;
-					$cc[2]->arc($xr, $yr, 25, PI - $a, PI) if $x1c - $x0c < 0 && $y1c - $y0c >= 0;
-					$cc[2]->stroke;
-				}
-				# Координатный прямоугольник
-				$cc[2]->set_source_rgba($c[1][0], $c[1][1], $c[1][2], $c[1][3]);
-				$cc[2]->rectangle($xr, $yr, $wr, $hr);
-				$cc[2]->stroke;
-				# Линии по центру
-				if($g[1]) {
-					$cc[2]->move_to($xr + int $wr / 2, $yr);
-					$cc[2]->line_to($xr + int $wr / 2, $yr + $hr);
-					$cc[2]->move_to($xr, $yr + int $hr / 2);
-					$cc[2]->line_to($xr + $wr, $yr + int $hr / 2);
-					$cc[2]->stroke;
-				}
-				# Золотое сечение
-				if($g[2]) {
-					$cc[2]->move_to($xr + int $wr * 0.382, $yr);
-					$cc[2]->line_to($xr + int $wr * 0.382, $yr + $hr);
-					$cc[2]->move_to($xr, $yr + int $hr * 0.382);
-					$cc[2]->line_to($xr + $wr, $yr + int $hr * 0.382);
-					$cc[2]->move_to($xr + int $wr * 0.618, $yr);
-					$cc[2]->line_to($xr + int $wr * 0.618, $yr + $hr);
-					$cc[2]->move_to($xr, $yr + int $hr * 0.618);
-					$cc[2]->line_to($xr + $wr, $yr + int $hr * 0.618);
-					$cc[2]->stroke;
-				}
-				# Основной отрезок
-				if($g[0]) {
-					$cc[2]->set_source_rgba($c[0][0], $c[0][1], $c[0][2], $c[0][3]);
-					$cc[2]->move_to($xr, $yr);
-					$cc[2]->line_to($xr + $wr, $yr + $hr);
-					$cc[2]->stroke;
-				}
-				# Текст
-				my ($tt, $te);
-				$cc[2]->set_source_rgba($c[4][0], $c[4][1], $c[4][2], $c[4][3]);
-				$cc[2]->select_font_face("sans", "normal", "normal");
-				$cc[2]->set_font_size(11);
-				my @pp = (3, 4, 5);
-				# Текст, ширина
-				$tt = $w; $te = $cc[2]->text_extents($tt);
-				$cc[2]->move_to($xr + $wr / 2 - $te->{"width"} / 2, $yr + $hr - ($y1c - $y0c >= 0 ? (0 - $te->{"height"} - $pp[1]) : $pp[2]));
-				$cc[2]->show_text($tt);
-				# Текст, высота
-				$tt = $h; $te = $cc[2]->text_extents($tt);
-				$cc[2]->move_to($xr + $wr + ($x1c - $x0c >= 0 ? $pp[0] : (0 - $te->{"width"} - $pp[1])), $yr + $hr / 2 + $te->{"height"} / 2);
-				$cc[2]->show_text($tt);
-				# Текст, угол
-				if($g[0]) {
-					$tt = "$ar°"; $te = $cc[2]->text_extents($tt);
-					$cc[2]->move_to($xr + ($x1c - $x0c >= 0 ? $pp[0] : (0 - $te->{"width"} - $pp[1])), $yr - ($y1c - $y0c >= 0 ? $pp[2] : (0 - $te->{"height"} - $pp[1])));
-					$cc[2]->show_text($tt);
-				}
-				# Текст, координаты начальные
-				$cc[2]->set_source_rgba($c[5][0], $c[5][1], $c[5][2], $c[5][3]);
-				$tt = "($x0c, $y0c)"; $te = $cc[2]->text_extents($tt);
-				$cc[2]->move_to($xr + ($x1c - $x0c >= 0 ? (0 - $te->{"width"} - $pp[1]) : $pp[0]), $yr - ($y1c - $y0c >= 0 ? $pp[2] : (0 - $te->{"height"} - $pp[1])));
-				$cc[2]->show_text($tt);
-				# Текст, координаты текущие
-				$cc[2]->set_source_rgba($c[3][0], $c[3][1], $c[3][2], $c[3][3]);
-				$tt = "($x1c, $y1c)"; $te = $cc[2]->text_extents($tt);
-				$cc[2]->move_to($xr + $wr + ($x1c - $x0c >= 0 ? $pp[0] : (0 - $te->{"width"} - $pp[1])), $yr + $hr - ($y1c - $y0c >= 0 ? (0 - $te->{"height"} - $pp[1]) : $pp[2]));
-				$cc[2]->show_text($tt);
-				# Текст, длина
-				if($g[0] && $w > 55 && $h > 31) {
-					$cc[2]->set_source_rgba($c[3][0], $c[3][1], $c[3][2], $c[3][3]);
-					$tt = "$lr"; $te = $cc[2]->text_extents($tt);
-					$cc[2]->move_to($xr + $wr / 2 + ($x1c - $x0c >= 0 ? $pp[0] : (0 - $te->{"width"} - $pp[1])), $yr + $hr / 2 - ($y1c - $y0c >= 0 ? $pp[2] : (0 - $te->{"height"} - $pp[1])));
-					$cc[2]->show_text($tt);
-				}
+				$c{context}->set_source_rgba($colors[1][0], $colors[1][1], $colors[1][2], $colors[1][3]);
+				$c{context}->move_to($c{x1} - $c{x0} >= 0 ? ($c{x1} - 0.5) : ($c{x1} + 1.5), 0);
+				$c{context}->line_to($c{x1} - $c{x0} >= 0 ? ($c{x1} - 0.5) : ($c{x1} + 1.5), $window->get_screen->get_height);
+				$c{context}->stroke;
+				$c{context}->move_to(0, $c{y1} - $c{y0} >= 0 ? ($c{y1} - 0.5) : ($c{y1} + 1.5));
+				$c{context}->line_to($window->get_screen->get_width, $c{y1} - $c{y0} >= 0 ? ($c{y1} - 0.5) : ($c{y1} + 1.5));
+				$c{context}->stroke;
+				&draw($S);
 			} else {
 				&cursor();
 			}
-			$da->queue_draw;
+			$widget->queue_draw;
 		}
+	}
+}
+sub calc {
+	my ($S, $x0, $y0, $x1, $y1, $state) = @_;
+	$$S->{x0} = $x0; $$S->{y0} = $y0; $$S->{x1} = $x1; $$S->{y1} = $y1;
+	# Выделение из центра
+	if($state && $state >= "control-mask") {$$S->{x0} = $x0 * 2 - $x1; $$S->{y0} = $y0 * 2 - $y1;};
+	# Выделение равностороннее
+	if($state && $state >= "shift-mask") {
+		if(abs $x1 - $x0 >= abs $y1 - $y0) {
+			$$S->{x1} = $x0 + round($arm * ($x1 - $x0 >= 0 ? (abs $y1 - $y0) : (0 - abs $y1 - $y0)));
+			$$S->{x0} = $x0 - round($arm * ($x1 - $x0 >= 0 ? (abs $y1 - $y0) : (0 - abs $y1 - $y0))) if $state && $state >= "control-mask";
+		} else {
+			$$S->{y1} = $y0 + round($arm * ($y1 - $y0 >= 0 ? (abs $x1 - $x0) : (0 - abs $x1 - $x0)));
+			$$S->{y0} = $y0 - round($arm * ($y1 - $y0 >= 0 ? (abs $x1 - $x0) : (0 - abs $x1 - $x0))) if $state && $state >= "control-mask";
+		}
+	};
+	# Расчёт ширины, высоты, длины, угла и значений для прорисовки
+	($$S->{w}, $$S->{h}) = (abs $$S->{x1} - $$S->{x0}, abs $$S->{y1} - $$S->{y0});
+	($$S->{l}, $$S->{a}) = (($$S->{w} ** 2 + $$S->{h} ** 2) ** 0.5, atan2($$S->{h}, $$S->{w}));
+	($$S->{xr}, $$S->{yr}, $$S->{wr}, $$S->{hr}) = ($$S->{x0} + 0.5, $$S->{y0} + 0.5, $$S->{x1} - $$S->{x0} >= 0 ? ($$S->{x1} - $$S->{x0} - 1) : ($$S->{x1} - $$S->{x0} + 1), $$S->{y1} - $$S->{y0} >= 0 ? ($$S->{y1} - $$S->{y0} - 1) : ($$S->{y1} - $$S->{y0} + 1));
+	$$S->{lr} = round($$S->{l}); $$S->{ar} = nearest(0.01, $$S->{a} * 180 / PI); $$S->{ar} =~ s/,/\./;
+}
+sub draw {
+	my ($S) = @_;
+	# Угол
+	if($g[0] && $$S->{w} > 25) {
+		$$S->{context}->set_source_rgba($colors[1][0], $colors[1][1], $colors[1][2], $colors[1][3]);
+		$$S->{context}->arc($$S->{xr}, $$S->{yr}, 25, 0, $$S->{a}) if $$S->{x1} - $$S->{x0} >= 0 && $$S->{y1} - $$S->{y0} >= 0;
+		$$S->{context}->arc($$S->{xr}, $$S->{yr}, 25, PI * 2 - $$S->{a}, 0) if $$S->{x1} - $$S->{x0} >= 0 && $$S->{y1} - $$S->{y0} < 0;
+		$$S->{context}->arc($$S->{xr}, $$S->{yr}, 25, PI, PI + $$S->{a}) if $$S->{x1} - $$S->{x0} < 0 && $$S->{y1} - $$S->{y0} < 0;
+		$$S->{context}->arc($$S->{xr}, $$S->{yr}, 25, PI - $$S->{a}, PI) if $$S->{x1} - $$S->{x0} < 0 && $$S->{y1} - $$S->{y0} >= 0;
+		$$S->{context}->stroke;
+	}
+	# Координатный прямоугольник
+	$$S->{context}->set_source_rgba($colors[1][0], $colors[1][1], $colors[1][2], $colors[1][3]);
+	$$S->{context}->rectangle($$S->{xr}, $$S->{yr}, $$S->{wr}, $$S->{hr});
+	$$S->{context}->stroke;
+	# Линии по центру
+	if($g[1]) {
+		$$S->{context}->move_to($$S->{xr} + int $$S->{wr} / 2, $$S->{yr});
+		$$S->{context}->line_to($$S->{xr} + int $$S->{wr} / 2, $$S->{yr} + $$S->{hr});
+		$$S->{context}->move_to($$S->{xr}, $$S->{yr} + int $$S->{hr} / 2);
+		$$S->{context}->line_to($$S->{xr} + $$S->{wr}, $$S->{yr} + int $$S->{hr} / 2);
+		$$S->{context}->stroke;
+	}
+	# Золотое сечение
+	if($g[2]) {
+		$$S->{context}->move_to($$S->{xr} + int $$S->{wr} * 0.382, $$S->{yr});
+		$$S->{context}->line_to($$S->{xr} + int $$S->{wr} * 0.382, $$S->{yr} + $$S->{hr});
+		$$S->{context}->move_to($$S->{xr}, $$S->{yr} + int $$S->{hr} * 0.382);
+		$$S->{context}->line_to($$S->{xr} + $$S->{wr}, $$S->{yr} + int $$S->{hr} * 0.382);
+		$$S->{context}->move_to($$S->{xr} + int $$S->{wr} * 0.618, $$S->{yr});
+		$$S->{context}->line_to($$S->{xr} + int $$S->{wr} * 0.618, $$S->{yr} + $$S->{hr});
+		$$S->{context}->move_to($$S->{xr}, $$S->{yr} + int $$S->{hr} * 0.618);
+		$$S->{context}->line_to($$S->{xr} + $$S->{wr}, $$S->{yr} + int $$S->{hr} * 0.618);
+		$$S->{context}->stroke;
+	}
+	# Основной отрезок
+	if($g[0]) {
+		$$S->{context}->set_source_rgba($colors[0][0], $colors[0][1], $colors[0][2], $colors[0][3]);
+		$$S->{context}->move_to($$S->{xr}, $$S->{yr});
+		$$S->{context}->line_to($$S->{xr} + $$S->{wr}, $$S->{yr} + $$S->{hr});
+		$$S->{context}->stroke;
+	}
+	# Текст
+	my ($tt, $te);
+	$$S->{context}->set_source_rgba($colors[4][0], $colors[4][1], $colors[4][2], $colors[4][3]);
+	$$S->{context}->select_font_face("sans", "normal", "normal");
+	$$S->{context}->set_font_size(11);
+	my @pp = (3, 4, 5);
+	# Текст, ширина
+	$tt = $$S->{w}; $te = $$S->{context}->text_extents($tt);
+	$$S->{context}->move_to($$S->{xr} + $$S->{wr} / 2 - $te->{"width"} / 2, $$S->{yr} + $$S->{hr} - ($$S->{y1} - $$S->{y0} >= 0 ? (0 - $te->{"height"} - $pp[1]) : $pp[2]));
+	$$S->{context}->show_text($tt);
+	# Текст, высота
+	$tt = $$S->{h}; $te = $$S->{context}->text_extents($tt);
+	$$S->{context}->move_to($$S->{xr} + $$S->{wr} + ($$S->{x1} - $$S->{x0} >= 0 ? $pp[0] : (0 - $te->{"width"} - $pp[1])), $$S->{yr} + $$S->{hr} / 2 + $te->{"height"} / 2);
+	$$S->{context}->show_text($tt);
+	# Текст, угол
+	if($g[0]) {
+		$tt = "$$S->{ar}°"; $te = $$S->{context}->text_extents($tt);
+		$$S->{context}->move_to($$S->{xr} + ($$S->{x1} - $$S->{x0} >= 0 ? $pp[0] : (0 - $te->{"width"} - $pp[1])), $$S->{yr} - ($$S->{y1} - $$S->{y0} >= 0 ? $pp[2] : (0 - $te->{"height"} - $pp[1])));
+		$$S->{context}->show_text($tt);
+	}
+	# Текст, координаты начальные
+	$$S->{context}->set_source_rgba($colors[5][0], $colors[5][1], $colors[5][2], $colors[5][3]);
+	$tt = "($$S->{x0}, $$S->{y0})"; $te = $$S->{context}->text_extents($tt);
+	$$S->{context}->move_to($$S->{xr} + ($$S->{x1} - $$S->{x0} >= 0 ? (0 - $te->{"width"} - $pp[1]) : $pp[0]), $$S->{yr} - ($$S->{y1} - $$S->{y0} >= 0 ? $pp[2] : (0 - $te->{"height"} - $pp[1])));
+	$$S->{context}->show_text($tt);
+	# Текст, координаты текущие
+	$$S->{context}->set_source_rgba($colors[3][0], $colors[3][1], $colors[3][2], $colors[3][3]);
+	$tt = "($$S->{x1}, $$S->{y1})"; $te = $$S->{context}->text_extents($tt);
+	$$S->{context}->move_to($$S->{xr} + $$S->{wr} + ($$S->{x1} - $$S->{x0} >= 0 ? $pp[0] : (0 - $te->{"width"} - $pp[1])), $$S->{yr} + $$S->{hr} - ($$S->{y1} - $$S->{y0} >= 0 ? (0 - $te->{"height"} - $pp[1]) : $pp[2]));
+	$$S->{context}->show_text($tt);
+	# Текст, длина
+	if($g[0] && $$S->{w} > 55 && $$S->{h} > 31) {
+		$$S->{context}->set_source_rgba($colors[3][0], $colors[3][1], $colors[3][2], $colors[3][3]);
+		$tt = "$$S->{lr}"; $te = $$S->{context}->text_extents($tt);
+		$$S->{context}->move_to($$S->{xr} + $$S->{wr} / 2 + ($$S->{x1} - $$S->{x0} >= 0 ? $pp[0] : (0 - $te->{"width"} - $pp[1])), $$S->{yr} + $$S->{hr} / 2 - ($$S->{y1} - $$S->{y0} >= 0 ? $pp[2] : (0 - $te->{"height"} - $pp[1])));
+		$$S->{context}->show_text($tt);
 	}
 }
 exit 0;
