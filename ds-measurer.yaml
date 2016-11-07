@@ -5,17 +5,21 @@ screenshot:
    format: png
    file:   ~/screenshot_%Y_%m_%d_%H_%M_%S.png
 shortcuts:
-   quit:             Escape
-   fixed ratio:      Shift_L
-   from center:      Control_L
-   screenshot:       s
-   segment line:     z
-   center lines:     x
-   golden sections:  c
-   freeze off:       d
-   freeze on:        f
-   freeze clear:     g
-   freeze clear all: j
+   quit:               Escape
+   fixed ratio:        Shift_L
+   from center:        Control_L
+   current measure:    Home
+   previous measure:   Page_Up
+   next measure:       Page_Down
+   freeze off:         d
+   freeze on:          f
+   freeze clear:       Delete
+   freeze clear last:  BackSpace
+   freeze clear all:   j
+   screenshot:         s
+   segment line:       z
+   center lines:       x
+   golden sections:    c
 aspect ratio shortcuts:
    1:       q
    4/3:     w
@@ -48,3 +52,10 @@ colors:
       text main:  { r: 1,    g: 1,    b: 1,    a: 1    }
       text basic: { r: 1,    g: 1,    b: 1,    a: 1    }
       text faded: { r: 1,    g: 1,    b: 1,    a: 1    }
+   highlight:
+      main:       { r: 1,    g: 0.23, b: 0,    a: 1    }
+      basic:      { r: 1,    g: 0.23, b: 0,    a: 1    }
+      faded:      { r: 1,    g: 0.23, b: 0,    a: 1    }
+      text main:  { r: 1,    g: 0.23, b: 0,    a: 1    }
+      text basic: { r: 1,    g: 0.23, b: 0,    a: 1    }
+      text faded: { r: 1,    g: 0.23, b: 0,    a: 1    }
