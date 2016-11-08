@@ -381,7 +381,7 @@ sub key_release {
 		$sf = 1;
 		&clear();
 		Glib::Timeout->add(100, sub {
-			&screenshot(defined $idx ? $s[$idx] : \%w);
+			&screenshot($state >= "button1-mask" ? \%w : $s[$idx]);
 			$sf = 0;
 			$widget->queue_draw;
 		});
