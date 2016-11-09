@@ -57,7 +57,7 @@ die "No configuration file found at:\n" . join("\n", @cpaths) . "\n" if !$config
 $config->{"screenshot"}->{"file"} =~ s/^~/$ENV{"HOME"}/;
 
 my (@s, $cb, $cr, $state);
-my ($sf, $arm) = (0, 1);
+my ($creating, $move, $arm, $sf) = (0, 0, 1, 0);
 my $freeze = $config->{"common"}->{"freeze"} eq "true" ? 1 : 0;
 our @g = (0, 1, 0);
 our @colors = &set_colors("default");
@@ -140,6 +140,23 @@ sub set_colors {
 	my @colors = ([$config->{"colors"}->{$ct}->{"main"}->{"r"}, $config->{"colors"}->{$ct}->{"main"}->{"g"}, $config->{"colors"}->{$ct}->{"main"}->{"b"}, $config->{"colors"}->{$ct}->{"main"}->{"a"}], [$config->{"colors"}->{$ct}->{"basic"}->{"r"}, $config->{"colors"}->{$ct}->{"basic"}->{"g"}, $config->{"colors"}->{$ct}->{"basic"}->{"b"}, $config->{"colors"}->{$ct}->{"basic"}->{"a"}], [$config->{"colors"}->{$ct}->{"faded"}->{"r"}, $config->{"colors"}->{$ct}->{"faded"}->{"g"}, $config->{"colors"}->{$ct}->{"faded"}->{"b"}, $config->{"colors"}->{$ct}->{"faded"}->{"a"}], [$config->{"colors"}->{$ct}->{"text main"}->{"r"}, $config->{"colors"}->{$ct}->{"text main"}->{"g"}, $config->{"colors"}->{$ct}->{"text main"}->{"b"}, $config->{"colors"}->{$ct}->{"text main"}->{"a"}], [$config->{"colors"}->{$ct}->{"text basic"}->{"r"}, $config->{"colors"}->{$ct}->{"text basic"}->{"g"}, $config->{"colors"}->{$ct}->{"text basic"}->{"b"}, $config->{"colors"}->{$ct}->{"text basic"}->{"a"}], [$config->{"colors"}->{$ct}->{"text faded"}->{"r"}, $config->{"colors"}->{$ct}->{"text faded"}->{"g"}, $config->{"colors"}->{$ct}->{"text faded"}->{"b"}, $config->{"colors"}->{$ct}->{"text faded"}->{"a"}]);
 	return @colors;
 }
+sub highlight {
+	my ($i, $widget, $event) = @_;
+	if(@s && (defined $i || defined $idx)) {
+		if(defined $idx) {
+			$s[$idx]{active} = 0;
+			&clear($s[$idx]{context});
+			&draw($s[$idx], $s[$idx]{g}, $s[$idx]{colors});
+		}
+		$idx = defined $i ? $i % @s : undef;
+		if(defined $idx) {
+			$s[$idx]{active} = 1;
+			&clear($s[$idx]{context});
+			&draw($s[$idx], $s[$idx]{g}, [&set_colors("highlight")]);
+		}
+		$widget->queue_draw;
+	}
+}
 sub key_n2c {
 	return Gtk2::Gdk::Keymap->get_entries_for_keyval(Gtk2::Gdk->keyval_from_name(shift))->{"keycode"};
 }
@@ -157,12 +174,14 @@ sub calc {
 			$$S{y1} = $y0 + round($arm * ($y1 - $y0 >= 0 ? (abs $x1 - $x0) : (0 - abs $x1 - $x0)));
 			$$S{y0} = $y0 - round($arm * ($y1 - $y0 >= 0 ? (abs $x1 - $x0) : (0 - abs $x1 - $x0))) if $state && $state >= "control-mask";
 		}
-	};
-	# Расчёт ширины, высоты, длины, угла и значений для прорисовки
-	($$S{w}, $$S{h}) = (abs $$S{x1} - $$S{x0}, abs $$S{y1} - $$S{y0});
-	($$S{l}, $$S{a}) = (($$S{w} ** 2 + $$S{h} ** 2) ** 0.5, atan2($$S{h}, $$S{w}));
+	}
+	if(!$move || !defined $$S{w}) {
+		# Расчёт ширины, высоты, длины, угла и значений для прорисовки
+		($$S{w}, $$S{h}) = (abs $$S{x1} - $$S{x0}, abs $$S{y1} - $$S{y0});
+		($$S{l}, $$S{a}) = (($$S{w} ** 2 + $$S{h} ** 2) ** 0.5, atan2($$S{h}, $$S{w}));
+		$$S{lr} = round($$S{l}); $$S{ar} = nearest(0.01, $$S{a} * 180 / PI); $$S{ar} =~ s/,/\./;
+	}
 	($$S{xr}, $$S{yr}, $$S{wr}, $$S{hr}) = ($$S{x0} + 0.5, $$S{y0} + 0.5, $$S{x1} - $$S{x0} >= 0 ? ($$S{x1} - $$S{x0} - 1) : ($$S{x1} - $$S{x0} + 1), $$S{y1} - $$S{y0} >= 0 ? ($$S{y1} - $$S{y0} - 1) : ($$S{y1} - $$S{y0} + 1));
-	$$S{lr} = round($$S{l}); $$S{ar} = nearest(0.01, $$S{a} * 180 / PI); $$S{ar} =~ s/,/\./;
 }
 sub draw {
 	my $S = $_[0];
@@ -257,44 +276,54 @@ sub expose {
 	$cr->paint;
 }
 sub motion {
-	if(!$sf) {
-		my ($widget, $event) = @_;
-		if(!defined($event) || $event->type eq "motion-notify" && $event->is_hint || $event->type eq "key-press" || $event->type eq "key-release") {
-			&clear($c{context}, $w{context});
-			if($state >= "button1-mask") {
-				(undef, $c{x1}, $c{y1}, $state) = $widget->window->get_pointer;
-				&calc(\%w, $c{x0}, $c{y0}, $c{x1}, $c{y1}, $state);
-				# Курсор
-				$c{context}->set_source_rgba($colors[1][0], $colors[1][1], $colors[1][2], $colors[1][3]);
-				$c{context}->move_to($c{x1} - $c{x0} >= 0 ? ($c{x1} - 0.5) : ($c{x1} + 1.5), 0);
-				$c{context}->line_to($c{x1} - $c{x0} >= 0 ? ($c{x1} - 0.5) : ($c{x1} + 1.5), $window->get_screen->get_height);
-				$c{context}->stroke;
-				$c{context}->move_to(0, $c{y1} - $c{y0} >= 0 ? ($c{y1} - 0.5) : ($c{y1} + 1.5));
-				$c{context}->line_to($window->get_screen->get_width, $c{y1} - $c{y0} >= 0 ? ($c{y1} - 0.5) : ($c{y1} + 1.5));
-				$c{context}->stroke;
-				&draw(\%w);
+	my ($widget, $event) = @_;
+	my $S = !$creating && defined $idx ? $s[$idx] : \%w;
+	if(!$sf && !defined($event) || $event->type eq "motion-notify" && $event->is_hint || $event->type eq "key-press" || $event->type eq "key-release") {
+		&clear($c{context});
+		if($state >= "button1-mask" && (!$move || $move && ($creating || defined $idx))) {
+			&clear($$S{context});
+			($c{dx}, $c{dy}) = ($c{x1}, $c{y1});
+			(undef, $c{x1}, $c{y1}, $state) = $widget->window->get_pointer;
+			($c{dx}, $c{dy}) = ($c{x1} - $c{dx}, $c{y1} - $c{dy});
+			($c{x0}, $c{y0}) = ($c{x0} + $c{dx}, $c{y0} + $c{dy}) if $move;
+			if($creating) {
+				&calc($S, $c{x0}, $c{y0}, $c{x1}, $c{y1}, $state);
 			} else {
-				&cursor();
+				&calc($S, $$S{x0} + $c{dx}, $$S{y0} + $c{dy}, $$S{x1} + $c{dx}, $$S{y1} + $c{dy}, $state);
 			}
-			$widget->queue_draw;
+			# Курсор
+			$c{context}->set_source_rgba($colors[1][0], $colors[1][1], $colors[1][2], $colors[1][3]);
+			$c{context}->move_to($c{x1} - $c{x0} >= 0 ? ($c{x1} - 0.5) : ($c{x1} + 1.5), 0);
+			$c{context}->line_to($c{x1} - $c{x0} >= 0 ? ($c{x1} - 0.5) : ($c{x1} + 1.5), $window->get_screen->get_height);
+			$c{context}->stroke;
+			$c{context}->move_to(0, $c{y1} - $c{y0} >= 0 ? ($c{y1} - 0.5) : ($c{y1} + 1.5));
+			$c{context}->line_to($window->get_screen->get_width, $c{y1} - $c{y0} >= 0 ? ($c{y1} - 0.5) : ($c{y1} + 1.5));
+			$c{context}->stroke;
+			&draw($S, $$S{g}, !$creating ? [&set_colors("highlight")] : undef);
+		} else {
+			&cursor();
 		}
+		$widget->queue_draw;
 	}
 }
 sub button_press {
 	my ($widget, $event) = @_;
-	if($event->button == 1) {
-		($c{x0}, $c{y0}) = $event->coords; $w{x0} = $c{x0}; $w{y0} = $c{y0}; $w{x1} = $c{x1}; $w{y1} = $c{y1};
+	if($event->button == 1 && !$move) {
+		$creating = 1;
+		($c{x0}, $c{y0}) = $event->coords;
+		$w{x0} = $c{x0}; $w{y0} = $c{y0}; $w{x1} = $c{x1}; $w{y1} = $c{y1};
 	}
-	if($event->button == 3 && (defined $idx || $state >= "button1-mask")) {
-		my $S = defined $idx ? $s[$idx] : \%w;
+	if($event->button == 3 && ($creating || defined $idx)) {
+		my $S = $creating ? \%w : $s[$idx];
 		$cb->set_text("⤢ $$S{w} ⨯ $$S{h} | 𝄩 $$S{lr} | ⦟ $$S{ar}° | ⇱ ($$S{x0}, $$S{y0}) | ⇲ ($$S{x1}, $$S{y1})");
 	}
 }
 sub button_release {
 	my ($widget, $event) = @_;
 	if($event->button == 1) {
-		&freeze() if $freeze;
+		&freeze() if $freeze && $creating;
 		&clear($c{context}, $w{context});
+		$creating = 0;
 		&cursor();
 		$widget->queue_draw;
 	}
@@ -306,20 +335,9 @@ sub key_press {
 	|| $event->hardware_keycode == key_n2c($config->{"shortcuts"}->{"from center"})) {
 		&motion;
 	}
-}
-sub highlight {
-	my ($i, $widget, $event) = @_;
-	if(@s && (defined $i || defined $idx)) {
-		if(defined $idx) {
-			&clear($s[$idx]{context});
-			&draw($s[$idx], $s[$idx]{g}, $s[$idx]{colors});
-		}
-		$idx = defined $i ? $i % @s : undef;
-		if(defined $idx) {
-			&clear($s[$idx]{context});
-			&draw($s[$idx], $s[$idx]{g}, [&set_colors("highlight")]);
-		}
-		$widget->queue_draw;
+	# Перемещение
+	if($event->hardware_keycode == key_n2c($config->{"shortcuts"}->{"move"})) {
+		$move = 1;
 	}
 }
 sub key_release {
@@ -328,6 +346,10 @@ sub key_release {
 	if($event->hardware_keycode == key_n2c($config->{"shortcuts"}->{"fixed ratio"})
 	|| $event->hardware_keycode == key_n2c($config->{"shortcuts"}->{"from center"})) {
 		&motion;
+	}
+	# Перемещение
+	if($event->hardware_keycode == key_n2c($config->{"shortcuts"}->{"move"})) {
+		$move = 0;
 	}
 	# Выход
 	if($event->hardware_keycode == key_n2c($config->{"shortcuts"}->{"quit"})) {
@@ -377,7 +399,7 @@ sub key_release {
 	}
 	# Скриншот
 	if($event->hardware_keycode == key_n2c($config->{"shortcuts"}->{"screenshot"})
-	&& (defined $idx || $state >= "button1-mask")) {
+	&& ($creating || defined $idx)) {
 		$sf = 1;
 		&clear();
 		Glib::Timeout->add(100, sub {

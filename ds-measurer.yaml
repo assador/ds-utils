@@ -6,6 +6,7 @@ screenshot:
    file:   ~/screenshot_%Y_%m_%d_%H_%M_%S.png
 shortcuts:
    quit:               Escape
+   move:               space
    fixed ratio:        Shift_L
    from center:        Control_L
    current measure:    Home
