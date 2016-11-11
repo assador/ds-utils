@@ -58,7 +58,6 @@ $config->{"screenshot"}->{"file"} =~ s/^~/$ENV{"HOME"}/;
 
 my (@s, $cb, $cr, $state);
 my ($creating, $move, $arm, $sf) = (0, 0, 1, 0);
-my $freeze = $config->{"common"}->{"freeze"} eq "true" ? 1 : 0;
 our @g = (0, 1, 0);
 our @colors = &set_colors("default");
 
@@ -321,7 +320,6 @@ sub button_press {
 sub button_release {
 	my ($widget, $event) = @_;
 	if($event->button == 1) {
-		&freeze() if $freeze && $creating;
 		&clear($c{context}, $w{context});
 		$creating = 0;
 		&cursor();
@@ -367,13 +365,9 @@ sub key_release {
 	if($event->hardware_keycode == key_n2c($config->{"shortcuts"}->{"next measure"})) {
 		&highlight(defined $idx ? $idx + 1 : 0, @_);
 	}
-	# Обычный режим
-	if($event->hardware_keycode == key_n2c($config->{"shortcuts"}->{"freeze off"})) {
-		$freeze = 0;
-	}
-	# Режим заморозки
-	if($event->hardware_keycode == key_n2c($config->{"shortcuts"}->{"freeze on"})) {
-		$freeze = 1;
+	# Заморозка
+	if($event->hardware_keycode == key_n2c($config->{"shortcuts"}->{"freeze"})) {
+		&freeze() if $creating;
 	}
 	# Удаление слоя заморозки
 	if($event->hardware_keycode == key_n2c($config->{"shortcuts"}->{"freeze clear"})) {

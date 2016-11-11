@@ -1,5 +1,3 @@
-common:
-   freeze: false
 screenshot:
    target: both
    format: png
@@ -12,8 +10,7 @@ shortcuts:
    current measure:    Home
    previous measure:   Page_Up
    next measure:       Page_Down
-   freeze off:         d
-   freeze on:          f
+   freeze:             f
    freeze clear:       Delete
    freeze clear last:  BackSpace
    freeze clear all:   j
