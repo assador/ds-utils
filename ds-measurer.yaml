@@ -1,19 +1,24 @@
+common:
+   guides mode: inner
 screenshot:
    target: both
    format: png
    file:   ~/screenshot_%Y_%m_%d_%H_%M_%S.png
 shortcuts:
    quit:               Escape
-   move:               space
    fixed ratio:        Shift_L
    from center:        Control_L
-   current measure:    Home
-   previous measure:   Page_Up
-   next measure:       Page_Down
    freeze:             f
-   freeze clear:       Delete
-   freeze clear last:  BackSpace
-   freeze clear all:   j
+   guide horizontal:   g
+   guide vertical:     b
+   for guide:          Caps_Lock
+   previous:           Page_Up
+   next:               Page_Down
+   deactivate:         Home
+   clear:              Delete
+   clear last:         BackSpace
+   clear all:          j
+   copy values:        space
    screenshot:         s
    segment line:       z
    center lines:       x
@@ -32,28 +37,28 @@ colors:
    default:
       main:       { r: 0,    g: 0.5,  b: 1,    a: 0.5  }
       basic:      { r: 0,    g: 0,    b: 0,    a: 0.25 }
-      faded:      { r: 0,    g: 0,    b: 0,    a: 0.15 }
+      guide:      { r: 0.45, g: 0.72, b: 0,    a: 0.33 }
       text main:  { r: 0,    g: 0.5,  b: 1,    a: 0.6  }
       text basic: { r: 0,    g: 0,    b: 0,    a: 0.75 }
       text faded: { r: 0,    g: 0,    b: 0,    a: 0.4  }
    dark:
-      main:       { r: 0,    g: 0,    b: 0,    a: 1    }
-      basic:      { r: 0,    g: 0,    b: 0,    a: 1    }
-      faded:      { r: 0,    g: 0,    b: 0,    a: 1    }
-      text main:  { r: 0,    g: 0,    b: 0,    a: 1    }
-      text basic: { r: 0,    g: 0,    b: 0,    a: 1    }
-      text faded: { r: 0,    g: 0,    b: 0,    a: 1    }
+      main:       { r: 0,    g: 0,    b: 0,    a: 0.8  }
+      basic:      { r: 0,    g: 0,    b: 0,    a: 0.5  }
+      guide:      { r: 0,    g: 0,    b: 0,    a: 0.4  }
+      text main:  { r: 0,    g: 0,    b: 0,    a: 0.9  }
+      text basic: { r: 0,    g: 0,    b: 0,    a: 0.75 }
+      text faded: { r: 0,    g: 0,    b: 0,    a: 0.5  }
    light:
-      main:       { r: 1,    g: 1,    b: 1,    a: 1    }
-      basic:      { r: 1,    g: 1,    b: 1,    a: 1    }
-      faded:      { r: 1,    g: 1,    b: 1,    a: 1    }
-      text main:  { r: 1,    g: 1,    b: 1,    a: 1    }
-      text basic: { r: 1,    g: 1,    b: 1,    a: 1    }
-      text faded: { r: 1,    g: 1,    b: 1,    a: 1    }
+      main:       { r: 1,    g: 1,    b: 1,    a: 0.8  }
+      basic:      { r: 1,    g: 1,    b: 1,    a: 0.5  }
+      guide:      { r: 1,    g: 1,    b: 1,    a: 0.4  }
+      text main:  { r: 1,    g: 1,    b: 1,    a: 0.9  }
+      text basic: { r: 1,    g: 1,    b: 1,    a: 0.75 }
+      text faded: { r: 1,    g: 1,    b: 1,    a: 0.5  }
    highlight:
-      main:       { r: 1,    g: 0.23, b: 0,    a: 1    }
-      basic:      { r: 1,    g: 0.23, b: 0,    a: 1    }
-      faded:      { r: 1,    g: 0.23, b: 0,    a: 1    }
-      text main:  { r: 1,    g: 0.23, b: 0,    a: 1    }
-      text basic: { r: 1,    g: 0.23, b: 0,    a: 1    }
-      text faded: { r: 1,    g: 0.23, b: 0,    a: 1    }
+      main:       { r: 1,    g: 0.23, b: 0,    a: 0.8  }
+      basic:      { r: 1,    g: 0.23, b: 0,    a: 0.5  }
+      guide:      { r: 1,    g: 0.23, b: 0,    a: 0.4  }
+      text main:  { r: 1,    g: 0.23, b: 0,    a: 0.9  }
+      text basic: { r: 1,    g: 0.23, b: 0,    a: 0.75 }
+      text faded: { r: 1,    g: 0.23, b: 0,    a: 0.5  }
