@@ -203,24 +203,29 @@ sub key_n2c {
 	return Gtk2::Gdk::Keymap->get_entries_for_keyval(Gtk2::Gdk->keyval_from_name(shift))->{"keycode"};
 }
 sub calc_m {
-	my ($S, $x0, $y0, $x1, $y1, $state) = @_;
+	my ($S, $x0, $y0, $x1, $y1, $fc, $fr) = @_;
+	$fc = $fromcenter if !defined $fc;
+	$fr = $fixedratio if !defined $fr;
 	$$S{x0} = $x0; $$S{y0} = $y0; $$S{x1} = $x1; $$S{y1} = $y1;
-	# Выделение из центра
-	if($fromcenter) {$$S{x0} = $x0 * 2 - $x1; $$S{y0} = $y0 * 2 - $y1;};
-	# Выделение с фиксированным соотношением сторон
-	if($fixedratio) {
-		if(abs $x1 - $x0 >= abs $y1 - $y0) {
-			$$S{x1} = $x0 + round($arm * ($x1 - $x0 >= 0 ? (abs $y1 - $y0) : (0 - abs $y1 - $y0)));
-			$$S{x0} = $x0 - round($arm * ($x1 - $x0 >= 0 ? (abs $y1 - $y0) : (0 - abs $y1 - $y0))) if $fromcenter;
-		} else {
-			$$S{y1} = $y0 + round($arm * ($y1 - $y0 >= 0 ? (abs $x1 - $x0) : (0 - abs $x1 - $x0)));
-			$$S{y0} = $y0 - round($arm * ($y1 - $y0 >= 0 ? (abs $x1 - $x0) : (0 - abs $x1 - $x0))) if $fromcenter;
+	# При !$creating только перемещение с прежними абсолютными координатами
+	if($creating) {
+		# Выделение из центра
+		if($fc) {$$S{x0} = $x0 * 2 - $x1; $$S{y0} = $y0 * 2 - $y1;};
+		# Выделение с фиксированным соотношением сторон
+		if($fr) {
+			if(abs $x1 - $x0 >= abs $y1 - $y0) {
+				$$S{x1} = $x0 + round($arm * ($x1 - $x0 >= 0 ? (abs $y1 - $y0) : (0 - abs $y1 - $y0)));
+				$$S{x0} = $x0 - round($arm * ($x1 - $x0 >= 0 ? (abs $y1 - $y0) : (0 - abs $y1 - $y0))) if $fc;
+			} else {
+				$$S{y1} = $y0 + round($arm * ($y1 - $y0 >= 0 ? (abs $x1 - $x0) : (0 - abs $x1 - $x0)));
+				$$S{y0} = $y0 - round($arm * ($y1 - $y0 >= 0 ? (abs $x1 - $x0) : (0 - abs $x1 - $x0))) if $fc;
+			}
 		}
+		# Расчёт ширины, высоты, длины, угла и значений для прорисовки
+		($$S{w}, $$S{h}) = (abs $$S{x1} - $$S{x0}, abs $$S{y1} - $$S{y0});
+		($$S{l}, $$S{a}) = (($$S{w} ** 2 + $$S{h} ** 2) ** 0.5, atan2($$S{h}, $$S{w}));
+		$$S{lr} = round($$S{l}); $$S{ar} = nearest(0.01, $$S{a} * 180 / PI); $$S{ar} =~ s/,/\./;
 	}
-	# Расчёт ширины, высоты, длины, угла и значений для прорисовки
-	($$S{w}, $$S{h}) = (abs $$S{x1} - $$S{x0}, abs $$S{y1} - $$S{y0});
-	($$S{l}, $$S{a}) = (($$S{w} ** 2 + $$S{h} ** 2) ** 0.5, atan2($$S{h}, $$S{w}));
-	$$S{lr} = round($$S{l}); $$S{ar} = nearest(0.01, $$S{a} * 180 / PI); $$S{ar} =~ s/,/\./;
 	($$S{xr}, $$S{wr}) = $$S{x1} - $$S{x0} >= 0 ? ($$S{x0} + $go, $$S{x1} - $$S{x0} - ($go + $go)) : ($$S{x0} - $go, $$S{x1} - $$S{x0} + ($go + $go));
 	($$S{yr}, $$S{hr}) = $$S{y1} - $$S{y0} >= 0 ? ($$S{y0} + $go, $$S{y1} - $$S{y0} - ($go + $go)) : ($$S{y0} - $go, $$S{y1} - $$S{y0} + ($go + $go));
 }
@@ -323,7 +328,7 @@ sub draw_m {
 	}
 }
 sub calc_g {
-	my ($S, $x, $y, $a, $state) = @_;
+	my ($S, $x, $y, $a) = @_;
 	$$S{x} = $x; $$S{y} = $y; $$S{a} = $a;
 	if($a / PI == int($a / PI)) {$$S{dx} = 1; $$S{dy} = 0;}
 		elsif($a / (PI / 2) == int($a / (PI / 2))) {$$S{dx} = 0; $$S{dy} = 1;}
@@ -381,10 +386,10 @@ sub motion {
 			}
 			# Расчёт выделения или перемещения
 			if($creating) {
-				&calc_m($S, $c{x0}, $c{y0}, $c{x1}, $c{y1}, $state);
+				&calc_m($S, $c{x0}, $c{y0}, $c{x1}, $c{y1});
 			} else {
-				if($type eq "g") {&calc_g($S, $$S{x} + $c{dx}, $$S{y} + $c{dy}, $$S{a}, $state);}
-					elsif($type eq "m") {&calc_m($S, $$S{x0} + $c{dx}, $$S{y0} + $c{dy}, $$S{x1} + $c{dx}, $$S{y1} + $c{dy}, $state);}
+				if($type eq "g") {&calc_g($S, $$S{x} + $c{dx}, $$S{y} + $c{dy}, $$S{a});}
+					elsif($type eq "m") {&calc_m($S, $$S{x0} + $c{dx}, $$S{y0} + $c{dy}, $$S{x1} + $c{dx}, $$S{y1} + $c{dy}, 0, 0);}
 			}
 			&clear($$S{context});
 			if($type eq "g" && !$creating) {&draw_g($S, !$creating ? [&set_colors("highlight")]->[2] : undef);}
