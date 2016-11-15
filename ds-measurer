@@ -438,7 +438,7 @@ sub key_press {
 		&motion;
 	}
 	# Для направляющих
-	if($event->hardware_keycode == key_n2c($config->{"shortcuts"}->{"for guide"})) {
+	if($event->hardware_keycode == 66) {
 		$type = $event->state & "lock-mask" ? "m" : "g";
 	}
 }

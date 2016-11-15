@@ -11,9 +11,6 @@ shortcuts:
    freeze:             f
    guide horizontal:   g
    guide vertical:     b
-   for guide:          Caps_Lock
-   previous:           Page_Up
-   next:               Page_Down
    deactivate:         Home
    clear:              Delete
    clear last:         BackSpace
