@@ -59,8 +59,8 @@ use Encode;
 my (@result, @dirs, $opte, %opts, $mask);
 my ($inner, $output, $template) = (0, "GIMP Palette\nName: colors_collected.gpl\nColumns: 0\n#\n", "");
 my @sample = (
-	'(?<!&)#([0-9a-fA-F]{6})(?![0-9a-fA-F])',
-	'(?<!&)#([0-9a-fA-F]{3})(?![0-9a-fA-F])',
+	'(?<!&)#([0-9a-fA-F]{6})\b',
+	'(?<!&)#([0-9a-fA-F]{3})\b',
 	'\brgba?\((.*?)\)',
 );
 
