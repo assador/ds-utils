@@ -1,6 +1,6 @@
 #!/usr/bin/perl
 #
-#  ds-measurer, v1.2, GTK+
+#  ds-measurer, v1.3, GTK+
 #  Copyright © 2016 Dmitry Sokolov
 #
 #  This file is part of ds-measurer.
@@ -56,10 +56,8 @@ foreach(@cpaths) {if(-s && -f) {$config = YAML::LoadFile($_); last;}}
 die "No configuration file found at:\n" . join("\n", @cpaths) . "\n" if !$config;
 $config->{"screenshot"}->{"file"} =~ s/^~/$ENV{"HOME"}/;
 
-my (@m, @g, %all, $cb, $cr, $state);
+my (@m, @g, %all, $cb, $cr);
 my ($last, $creating, $move, $fromcenter, $fixedratio, $arm, $sf) = (0, 0, 0, 0, 0, 1, 0);
-our @marks = (0, 1, 0);
-our @colors = &set_colors("default");
 my %idx = (m => undef, g => undef);
 my %pack = (m => \@m, g => \@g);
 my %calc = (m => \&calc_m, g => \&calc_g);
@@ -91,6 +89,8 @@ $da->window->set_cursor(Gtk2::Gdk::Cursor::new(undef, "blank-cursor"));
 my %image = &cscc("image");
 my %c = &cscc();
 my %w = &cscc();
+$w{marks} = [0, 1, 0];
+$w{colors} = [&set_colors("default")];
 
 &cursor();
 Gtk2->main;
@@ -110,8 +110,8 @@ sub freeze {
 	$m[$#m]{type} = "m";
 	$m[$#m]{id} = ++$last;
 	$all{$last} = \$m[$#m];
-	$m[$#m]{marks} = [@marks];
-	$m[$#m]{colors} = [@colors];
+	$m[$#m]{marks} = [@{$w{marks}}];
+	$m[$#m]{colors} = [@{$w{colors}}];
 	&calc_m($m[$#m], $c{x0}, $c{y0}, $c{x1}, $c{y1});
 	&draw_m($m[$#m]);
 }
@@ -121,12 +121,12 @@ sub guide {
 	$g[$#g]{type} = "g";
 	$g[$#g]{id} = ++$last;
 	$all{$last} = \$g[$#g];
-	$g[$#g]{color} = [@{$colors[2]}];
+	$g[$#g]{color} = [@{$w{colors}[2]}];
 	&calc_g($g[$#g], $c{xr}, $c{yr}, $a);
 	&draw_g($g[$#g]);
 }
 sub cursor {
-	(undef, $c{x1}, $c{y1}, $state) = $da->window->get_pointer;
+	(undef, $c{x1}, $c{y1}) = $da->window->get_pointer;
 	if(defined $c{x0}) {
 		$c{xr} = $c{x1} - $c{x0} >= 0 ? ($c{x1} - $go) : ($c{x1} + $go);
 		$c{yr} = $c{y1} - $c{y0} >= 0 ? ($c{y1} - $go) : ($c{y1} + $go);
@@ -134,7 +134,7 @@ sub cursor {
 		$c{xr} = $c{x1} + $go;
 		$c{yr} = $c{y1} + $go;
 	}
-	$c{context}->set_source_rgba(@{$colors[1]});
+	$c{context}->set_source_rgba(@{$w{colors}[1]});
 	$c{context}->move_to($c{xr}, 0);
 	$c{context}->line_to($c{xr}, $window->get_screen->get_height);
 	$c{context}->move_to(0, $c{yr});
@@ -150,6 +150,14 @@ sub clear {
 		$_->new_path;
 	}
 	return @contexts;
+}
+sub clear_in {
+	my ($C, $x, $y, $w, $h) = @_;
+	$C->rectangle($x, $y, $w, $h);
+	$C->set_operator("clear");
+	$C->fill;
+	$C->set_operator("over");
+	$C->new_path;
 }
 sub screenshot {
 	my ($S) = @_;
@@ -179,7 +187,7 @@ sub set_colors {
 	return @colors;
 }
 sub highlight {
-	my ($t, $i, $widget, $event) = @_;
+	my ($t, $i, $widget) = @_;
 	if(@{$pack{$t}}) {
 		if(defined $i || defined $idx{$t}) {
 			if(defined $idx{$t}) {
@@ -198,6 +206,13 @@ sub highlight {
 			$widget->queue_draw;
 		}
 	}
+}
+sub maskout_delta {
+	my ($S, $d) = @_;
+	$$S{frame} = 0 if !defined $$S{frame};
+	$$S{frame} = nearest(0.001, $$S{frame} + $d);
+	$$S{frame} = 0 if $$S{frame} < 0;
+	$$S{frame} = 1 if $$S{frame} > 1;
 }
 sub key_n2c {
 	return Gtk2::Gdk::Keymap->get_entries_for_keyval(Gtk2::Gdk->keyval_from_name(shift))->{"keycode"};
@@ -231,100 +246,123 @@ sub calc_m {
 }
 sub draw_m {
 	my $S = $_[0];
-	local @marks = $_[1] ? @{$_[1]} : @marks;
-	local @colors = $_[2] ? @{$_[2]} : @colors;
-	# Угол
-	if($marks[0] && $$S{w} > 25) {
+	my @marks = $_[1] ? @{$_[1]} : @{$w{marks}};
+	my @colors = $_[2] ? @{$_[2]} : @{$w{colors}};
+	if($$S{frame}) {
+		$$S{context}->save;
+		$$S{context}->set_source_rgba(0, 0, 0, $$S{frame});
+		$$S{context}->paint;
+		if($$S{active}) {
+			for(my $i = 1; $i < 5; $i++) {
+				$$S{context}->set_line_width($i * 4);
+				$$S{context}->set_source_rgba(0, 0, 0, 0.25 * $$S{frame} / $i);
+				$$S{context}->rectangle($$S{x0}, $$S{y0}, $$S{x1} - $$S{x0}, $$S{y1} - $$S{y0});
+				$$S{context}->stroke;
+			}
+		}
+		&clear_in($$S{context}, $$S{x0}, $$S{y0}, $$S{x1} - $$S{x0}, $$S{y1} - $$S{y0});
+		&clear_in($c{context}, $$S{x0}, $$S{y0}, $$S{x1} - $$S{x0}, $$S{y1} - $$S{y0});
+		$$S{context}->restore;
+	} else {
+		# Координатный прямоугольник
 		$$S{context}->set_source_rgba(@{$colors[1]});
-		$$S{context}->arc($$S{xr}, $$S{yr}, 25, 0, $$S{a}) if $$S{x1} - $$S{x0} >= 0 && $$S{y1} - $$S{y0} >= 0;
-		$$S{context}->arc($$S{xr}, $$S{yr}, 25, PI * 2 - $$S{a}, 0) if $$S{x1} - $$S{x0} >= 0 && $$S{y1} - $$S{y0} < 0;
-		$$S{context}->arc($$S{xr}, $$S{yr}, 25, PI, PI + $$S{a}) if $$S{x1} - $$S{x0} < 0 && $$S{y1} - $$S{y0} < 0;
-		$$S{context}->arc($$S{xr}, $$S{yr}, 25, PI - $$S{a}, PI) if $$S{x1} - $$S{x0} < 0 && $$S{y1} - $$S{y0} >= 0;
+		$$S{context}->rectangle($$S{xr}, $$S{yr}, $$S{wr}, $$S{hr});
 		$$S{context}->stroke;
 	}
-	# Координатный прямоугольник
-	$$S{context}->set_source_rgba(@{$colors[1]});
-	$$S{context}->rectangle($$S{xr}, $$S{yr}, $$S{wr}, $$S{hr});
-	# Линии по центру
-	if($marks[1]) {
-		$$S{context}->move_to($$S{xr} + ceil($$S{wr} / 2), $$S{yr});
-		$$S{context}->line_to($$S{xr} + ceil($$S{wr} / 2), $$S{yr} + $$S{hr});
-		$$S{context}->move_to($$S{xr}, $$S{yr} + ceil($$S{hr} / 2));
-		$$S{context}->line_to($$S{xr} + $$S{wr}, $$S{yr} + ceil($$S{hr} / 2));
-	}
-	# Золотое сечение
-	if($marks[2]) {
-		$$S{context}->move_to($$S{xr} + ceil($$S{wr} * 0.382), $$S{yr});
-		$$S{context}->line_to($$S{xr} + ceil($$S{wr} * 0.382), $$S{yr} + $$S{hr});
-		$$S{context}->move_to($$S{xr}, $$S{yr} + ceil($$S{hr} * 0.382));
-		$$S{context}->line_to($$S{xr} + $$S{wr}, $$S{yr} + ceil($$S{hr} * 0.382));
-		$$S{context}->move_to($$S{xr} + ceil($$S{wr} * 0.618), $$S{yr});
-		$$S{context}->line_to($$S{xr} + ceil($$S{wr} * 0.618), $$S{yr} + $$S{hr});
-		$$S{context}->move_to($$S{xr}, $$S{yr} + ceil($$S{hr} * 0.618));
-		$$S{context}->line_to($$S{xr} + $$S{wr}, $$S{yr} + ceil($$S{hr} * 0.618));
-	}
-	$$S{context}->stroke;
-	# Основной отрезок
-	if($marks[0]) {
-		$$S{context}->set_source_rgba(@{$colors[0]});
-		$$S{context}->move_to($$S{xr}, $$S{yr});
-		$$S{context}->line_to($$S{xr} + $$S{wr}, $$S{yr} + $$S{hr});
-		$$S{context}->stroke;
-	}
-	# Текст
-	my ($tt, $te);
-	$$S{context}->set_source_rgba(@{$colors[4]});
-	$$S{context}->select_font_face("sans", "normal", "normal");
-	$$S{context}->set_font_size(11);
-	my @pp = (3, 4, 5);
-	# Текст, ширина
-	$tt = $$S{w}; $te = $$S{context}->text_extents($tt);
-	$$S{context}->move_to(
-		$$S{xr} + $$S{wr} / 2 - $te->{"width"} / 2,
-		$$S{yr} + $$S{hr} - ($$S{y1} - $$S{y0} >= 0 ? (0 - $te->{"height"} - $pp[1]) : $pp[2])
-	);
-	$$S{context}->show_text($tt);
-	# Текст, высота
-	$tt = $$S{h}; $te = $$S{context}->text_extents($tt);
-	$$S{context}->move_to(
-		$$S{xr} + $$S{wr} + ($$S{x1} - $$S{x0} >= 0 ? $pp[0] : (0 - $te->{"width"} - $pp[1])),
-		$$S{yr} + $$S{hr} / 2 + $te->{"height"} / 2
-	);
-	$$S{context}->show_text($tt);
-	# Текст, угол
-	if($marks[0]) {
-		$tt = "$$S{ar}°"; $te = $$S{context}->text_extents($tt);
+	if(!$$S{frame} || !$$S{onlymask}) {
+		# Угол
+		if($marks[0] && $$S{w} > 25) {
+			$$S{context}->set_source_rgba(@{$colors[1]});
+			$$S{context}->arc($$S{xr}, $$S{yr}, 25, 0, $$S{a}) if $$S{x1} - $$S{x0} >= 0 && $$S{y1} - $$S{y0} >= 0;
+			$$S{context}->arc($$S{xr}, $$S{yr}, 25, PI * 2 - $$S{a}, 0) if $$S{x1} - $$S{x0} >= 0 && $$S{y1} - $$S{y0} < 0;
+			$$S{context}->arc($$S{xr}, $$S{yr}, 25, PI, PI + $$S{a}) if $$S{x1} - $$S{x0} < 0 && $$S{y1} - $$S{y0} < 0;
+			$$S{context}->arc($$S{xr}, $$S{yr}, 25, PI - $$S{a}, PI) if $$S{x1} - $$S{x0} < 0 && $$S{y1} - $$S{y0} >= 0;
+			$$S{context}->stroke;
+		}
+		# Линии по центру
+		if($marks[1]) {
+			$$S{context}->set_source_rgba(@{$colors[1]});
+			$$S{context}->move_to($$S{xr} + ceil($$S{wr} / 2), $$S{yr});
+			$$S{context}->line_to($$S{xr} + ceil($$S{wr} / 2), $$S{yr} + $$S{hr});
+			$$S{context}->move_to($$S{xr}, $$S{yr} + ceil($$S{hr} / 2));
+			$$S{context}->line_to($$S{xr} + $$S{wr}, $$S{yr} + ceil($$S{hr} / 2));
+			$$S{context}->stroke;
+		}
+		# Золотое сечение
+		if($marks[2]) {
+			$$S{context}->set_source_rgba(@{$colors[1]});
+			$$S{context}->move_to($$S{xr} + ceil($$S{wr} * 0.382), $$S{yr});
+			$$S{context}->line_to($$S{xr} + ceil($$S{wr} * 0.382), $$S{yr} + $$S{hr});
+			$$S{context}->move_to($$S{xr}, $$S{yr} + ceil($$S{hr} * 0.382));
+			$$S{context}->line_to($$S{xr} + $$S{wr}, $$S{yr} + ceil($$S{hr} * 0.382));
+			$$S{context}->move_to($$S{xr} + ceil($$S{wr} * 0.618), $$S{yr});
+			$$S{context}->line_to($$S{xr} + ceil($$S{wr} * 0.618), $$S{yr} + $$S{hr});
+			$$S{context}->move_to($$S{xr}, $$S{yr} + ceil($$S{hr} * 0.618));
+			$$S{context}->line_to($$S{xr} + $$S{wr}, $$S{yr} + ceil($$S{hr} * 0.618));
+			$$S{context}->stroke;
+		}
+		# Основной отрезок
+		if($marks[0]) {
+			$$S{context}->set_source_rgba(@{$colors[0]});
+			$$S{context}->move_to($$S{xr}, $$S{yr});
+			$$S{context}->line_to($$S{xr} + $$S{wr}, $$S{yr} + $$S{hr});
+			$$S{context}->stroke;
+		}
+		# Текст
+		my ($tt, $te);
+		$$S{context}->set_source_rgba(@{$colors[4]});
+		$$S{context}->select_font_face("sans", "normal", "normal");
+		$$S{context}->set_font_size(11);
+		my @pp = (3, 4, 5);
+		# Текст, ширина
+		$tt = $$S{w}; $te = $$S{context}->text_extents($tt);
 		$$S{context}->move_to(
-			$$S{xr} + ($$S{x1} - $$S{x0} >= 0 ? $pp[0] : (0 - $te->{"width"} - $pp[1])),
+			$$S{xr} + $$S{wr} / 2 - $te->{"width"} / 2,
+			$$S{yr} + $$S{hr} - ($$S{y1} - $$S{y0} >= 0 ? (0 - $te->{"height"} - $pp[1]) : $pp[2])
+		);
+		$$S{context}->show_text($tt);
+		# Текст, высота
+		$tt = $$S{h}; $te = $$S{context}->text_extents($tt);
+		$$S{context}->move_to(
+			$$S{xr} + $$S{wr} + ($$S{x1} - $$S{x0} >= 0 ? $pp[0] : (0 - $te->{"width"} - $pp[1])),
+			$$S{yr} + $$S{hr} / 2 + $te->{"height"} / 2
+		);
+		$$S{context}->show_text($tt);
+		# Текст, угол
+		if($marks[0]) {
+			$tt = "$$S{ar}°"; $te = $$S{context}->text_extents($tt);
+			$$S{context}->move_to(
+				$$S{xr} + ($$S{x1} - $$S{x0} >= 0 ? $pp[0] : (0 - $te->{"width"} - $pp[1])),
+				$$S{yr} - ($$S{y1} - $$S{y0} >= 0 ? $pp[2] : (0 - $te->{"height"} - $pp[1]))
+			);
+			$$S{context}->show_text($tt);
+		}
+		# Текст, координаты начальные
+		$$S{context}->set_source_rgba(@{$colors[5]});
+		$tt = "($$S{x0}, $$S{y0})"; $te = $$S{context}->text_extents($tt);
+		$$S{context}->move_to(
+			$$S{xr} + ($$S{x1} - $$S{x0} >= 0 ? (0 - $te->{"width"} - $pp[1]) : $pp[0]),
 			$$S{yr} - ($$S{y1} - $$S{y0} >= 0 ? $pp[2] : (0 - $te->{"height"} - $pp[1]))
 		);
 		$$S{context}->show_text($tt);
-	}
-	# Текст, координаты начальные
-	$$S{context}->set_source_rgba(@{$colors[5]});
-	$tt = "($$S{x0}, $$S{y0})"; $te = $$S{context}->text_extents($tt);
-	$$S{context}->move_to(
-		$$S{xr} + ($$S{x1} - $$S{x0} >= 0 ? (0 - $te->{"width"} - $pp[1]) : $pp[0]),
-		$$S{yr} - ($$S{y1} - $$S{y0} >= 0 ? $pp[2] : (0 - $te->{"height"} - $pp[1]))
-	);
-	$$S{context}->show_text($tt);
-	# Текст, координаты текущие
-	$$S{context}->set_source_rgba(@{$colors[3]});
-	$tt = "($$S{x1}, $$S{y1})"; $te = $$S{context}->text_extents($tt);
-	$$S{context}->move_to(
-		$$S{xr} + $$S{wr} + ($$S{x1} - $$S{x0} >= 0 ? $pp[0] : (0 - $te->{"width"} - $pp[1])),
-		$$S{yr} + $$S{hr} - ($$S{y1} - $$S{y0} >= 0 ? (0 - $te->{"height"} - $pp[1]) : $pp[2])
-	);
-	$$S{context}->show_text($tt);
-	# Текст, длина
-	if($marks[0] && $$S{w} > 55 && $$S{h} > 31) {
+		# Текст, координаты текущие
 		$$S{context}->set_source_rgba(@{$colors[3]});
-		$tt = "$$S{lr}"; $te = $$S{context}->text_extents($tt);
+		$tt = "($$S{x1}, $$S{y1})"; $te = $$S{context}->text_extents($tt);
 		$$S{context}->move_to(
-			$$S{xr} + $$S{wr} / 2 + ($$S{x1} - $$S{x0} >= 0 ? $pp[0] : (0 - $te->{"width"} - $pp[1])),
-			$$S{yr} + $$S{hr} / 2 - ($$S{y1} - $$S{y0} >= 0 ? $pp[2] : (0 - $te->{"height"} - $pp[1]))
+			$$S{xr} + $$S{wr} + ($$S{x1} - $$S{x0} >= 0 ? $pp[0] : (0 - $te->{"width"} - $pp[1])),
+			$$S{yr} + $$S{hr} - ($$S{y1} - $$S{y0} >= 0 ? (0 - $te->{"height"} - $pp[1]) : $pp[2])
 		);
 		$$S{context}->show_text($tt);
+		# Текст, длина
+		if($marks[0] && $$S{w} > 55 && $$S{h} > 31) {
+			$$S{context}->set_source_rgba(@{$colors[3]});
+			$tt = "$$S{lr}"; $te = $$S{context}->text_extents($tt);
+			$$S{context}->move_to(
+				$$S{xr} + $$S{wr} / 2 + ($$S{x1} - $$S{x0} >= 0 ? $pp[0] : (0 - $te->{"width"} - $pp[1])),
+				$$S{yr} + $$S{hr} / 2 - ($$S{y1} - $$S{y0} >= 0 ? $pp[2] : (0 - $te->{"height"} - $pp[1]))
+			);
+			$$S{context}->show_text($tt);
+		}
 	}
 }
 sub calc_g {
@@ -366,13 +404,14 @@ sub expose {
 sub motion {
 	my ($widget, $event) = @_;
 	my $S = !$creating && defined $idx{$type} ? ${$pack{$type}}[$idx{$type}] : \%w;
-	if(!$sf && !defined($event) || $event->type eq "motion-notify" && $event->is_hint || $event->type eq "key-press" || $event->type eq "key-release") {
+	if(!$sf && (!defined($event) || $event->type eq "motion-notify" && $event->is_hint || $event->type eq "key-press" || $event->type eq "key-release")) {
 		&clear($c{context});
-		if(!$move && $creating || $move && ($creating || defined $idx{$type})) {
-			# Расчёт последнего смещения курсора
-			($c{dx}, $c{dy}) = ($c{x1}, $c{y1});
-			&cursor();
-			($c{dx}, $c{dy}) = ($c{x1} - $c{dx}, $c{y1} - $c{dy});
+		# Расчёт последнего смещения курсора
+		($c{dx}, $c{dy}) = ($c{x1}, $c{y1});
+		&cursor();
+		($c{dx}, $c{dy}) = ($c{x1} - $c{dx}, $c{y1} - $c{dy});
+		if($event->state & "mod1-mask" && ($creating || defined $idx{$type})) {&maskout_delta($S, $c{dy} * 0.002);}
+		if($creating || defined $idx{$type} && $move) {
 			if($move) {
 				# Новые «координаты клика» курсора при передвижении вместо выделения
 				if(defined $c{x0}) {
@@ -391,11 +430,11 @@ sub motion {
 				if($type eq "g") {&calc_g($S, $$S{x} + $c{dx}, $$S{y} + $c{dy}, $$S{a});}
 					elsif($type eq "m") {&calc_m($S, $$S{x0} + $c{dx}, $$S{y0} + $c{dy}, $$S{x1} + $c{dx}, $$S{y1} + $c{dy}, 0, 0);}
 			}
+		}
+		if($creating || defined $idx{$type} && ($move || $event->state & "mod1-mask" || $event->type eq "key-release")) {
 			&clear($$S{context});
 			if($type eq "g" && !$creating) {&draw_g($S, !$creating ? [&set_colors("highlight")]->[2] : undef);}
 				elsif($type eq "m" || $creating) {&draw_m($S, $$S{marks}, !$creating ? [&set_colors("highlight")] : undef);}
-		} else {
-			&cursor();
 		}
 		$widget->queue_draw;
 	}
@@ -423,12 +462,15 @@ sub button_release {
 	if($event->button == 3) {
 		$move = 0;
 	}
+	if($event->button == 2) {
+		&highlight($type, undef, $widget);
+	}
 }
 # Активировать предыдущее / следующее
 sub scroll {
 	my ($widget, $event) = @_;
 	my $d = $event->direction eq "down" ? 1 : 0;
-	&highlight($type, defined $idx{$type} ? $idx{$type} + ($d ? 1 : -1) : ($d ? 0 : (@{$pack{$type}} - 1)), @_);
+	&highlight($type, defined $idx{$type} ? $idx{$type} + ($d ? 1 : -1) : ($d ? 0 : (@{$pack{$type}} - 1)), $widget);
 }
 sub key_press {
 	my ($widget, $event) = @_;
@@ -469,10 +511,6 @@ sub key_release {
 	# Выход
 	if($event->hardware_keycode == key_n2c($config->{"shortcuts"}->{"quit"})) {
 		exit 0;
-	}
-	# Сбросить активные
-	if($event->hardware_keycode == key_n2c($config->{"shortcuts"}->{"deactivate"})) {
-		&highlight($type, undef, @_);
 	}
 	# Заморозка
 	if($event->hardware_keycode == key_n2c($config->{"shortcuts"}->{"freeze"})) {
@@ -520,30 +558,46 @@ sub key_release {
 		$sf = 1;
 		&clear();
 		Glib::Timeout->add(100, sub {
-			&screenshot($state >= "button1-mask" ? \%w : $m[$idx{m}]);
+			&screenshot($creating ? \%w : $m[$idx{m}]);
 			$sf = 0;
 			$widget->queue_draw;
 		});
 	}
 	# Основной отрезок
-	if($event->hardware_keycode == key_n2c($config->{"shortcuts"}->{"segment line"})) {
-		$marks[0] = !$marks[0];
+	if($event->hardware_keycode == key_n2c($config->{"shortcuts"}->{"segment line"})
+	&& ($creating || defined $idx{m})) {
+		my $S = $creating ? \%w : $m[$idx{m}];
+		$$S{marks}[0] = !$$S{marks}[0];
 		&motion;
 	}
 	# Линии по центру
-	if($event->hardware_keycode == key_n2c($config->{"shortcuts"}->{"center lines"})) {
-		$marks[1] = !$marks[1];
+	if($event->hardware_keycode == key_n2c($config->{"shortcuts"}->{"center lines"})
+	&& ($creating || defined $idx{m})) {
+		my $S = $creating ? \%w : $m[$idx{m}];
+		$$S{marks}[1] = !$$S{marks}[1];
 		&motion;
 	}
 	# Золотое сечение
-	if($event->hardware_keycode == key_n2c($config->{"shortcuts"}->{"golden sections"})) {
-		$marks[2] = !$marks[2];
+	if($event->hardware_keycode == key_n2c($config->{"shortcuts"}->{"golden sections"})
+	&& ($creating || defined $idx{m})) {
+		my $S = $creating ? \%w : $m[$idx{m}];
+		$$S{marks}[2] = !$$S{marks}[2];
+		&motion;
+	}
+	# Вспомогательные линии
+	if($event->hardware_keycode == key_n2c($config->{"shortcuts"}->{"only mask"})
+	&& ($creating || defined $idx{m})) {
+		my $S = $creating ? \%w : $m[$idx{m}];
+		$$S{onlymask} = !$$S{onlymask};
 		&motion;
 	}
 	# Цветовые схемы
 	while(my ($key, $value) = each %{$config->{"colors shortcuts"}}) {
-		if($event->hardware_keycode == key_n2c($value)) {
-			@colors = &set_colors($key);
+		if($event->hardware_keycode == key_n2c($value)
+		&& ($creating || defined $idx{$type})) {
+			my $S = $creating ? \%w : ${$pack{$type}}[$idx{$type}];
+			$$S{color} = [&set_colors($key)]->[2] if $type eq "g";
+			$$S{colors} = [&set_colors($key)] if $type eq "m";
 			&motion;
 		}
 	}
