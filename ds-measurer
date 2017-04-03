@@ -1,6 +1,6 @@
 #!/usr/bin/perl
 #
-#  ds-measurer, v1.3, GTK+
+#  ds-measurer, v1.3.1, GTK+
 #  Copyright © 2016 Dmitry Sokolov
 #
 #  This file is part of ds-measurer.
@@ -446,7 +446,7 @@ sub button_press {
 		($c{x0i}, $c{y0i}) = $event->coords;
 		($c{x0}, $c{y0}) = ($c{x0i}, $c{y0i});
 	}
-	if($event->button == 3) {
+	elsif($event->button == 3) {
 		$move = 1;
 	}
 }
@@ -459,10 +459,10 @@ sub button_release {
 		&cursor();
 		$widget->queue_draw;
 	}
-	if($event->button == 3) {
+	elsif($event->button == 3) {
 		$move = 0;
 	}
-	if($event->button == 2) {
+	elsif($event->button == 2) {
 		&highlight($type, undef, $widget);
 	}
 }
@@ -480,12 +480,12 @@ sub key_press {
 		&motion;
 	}
 	# Выделение с фиксированным соотношением сторон
-	if($event->hardware_keycode == key_n2c($config->{"shortcuts"}->{"fixed ratio"})) {
+	elsif($event->hardware_keycode == key_n2c($config->{"shortcuts"}->{"fixed ratio"})) {
 		$fixedratio = 1;
 		&motion;
 	}
 	# Для направляющих
-	if($event->hardware_keycode == 66) {
+	elsif($event->hardware_keycode == 66) {
 		$type = $event->state & "lock-mask" ? "m" : "g";
 	}
 }
@@ -497,38 +497,38 @@ sub key_release {
 		&motion;
 	}
 	# Отмена выделения с фиксированным соотношением сторон
-	if($event->hardware_keycode == key_n2c($config->{"shortcuts"}->{"fixed ratio"})) {
+	elsif($event->hardware_keycode == key_n2c($config->{"shortcuts"}->{"fixed ratio"})) {
 		$fixedratio = 0;
 		&motion;
 	}
 	# Копирование значений в буфер обмена
-	if($event->hardware_keycode == key_n2c($config->{"shortcuts"}->{"copy values"})
+	elsif($event->hardware_keycode == key_n2c($config->{"shortcuts"}->{"copy values"})
 	&& ($creating || defined $idx{g} || defined $idx{m})) {
 		my $S = $creating ? \%w : (defined $idx{$type} ? ${$pack{$type}}[$idx{$type}] : ($type eq "m" ? $g[$idx{g}] : $m[$idx{m}]));
 		if($$S{type} eq "m") {$cb->set_text("⤢ $$S{w} ⨯ $$S{h} | 𝄩 $$S{lr} | ⦟ $$S{ar}° | ⇱ ($$S{x0}, $$S{y0}) | ⇲ ($$S{x1}, $$S{y1})");}
 			elsif($$S{type} eq "g") {$cb->set_text("🞡 ($$S{x}, $$S{y}) | ⦟ $$S{ar}°");}
 	}
 	# Выход
-	if($event->hardware_keycode == key_n2c($config->{"shortcuts"}->{"quit"})) {
+	elsif($event->hardware_keycode == key_n2c($config->{"shortcuts"}->{"quit"})) {
 		exit 0;
 	}
 	# Заморозка
-	if($event->hardware_keycode == key_n2c($config->{"shortcuts"}->{"freeze"})) {
+	elsif($event->hardware_keycode == key_n2c($config->{"shortcuts"}->{"freeze"})) {
 		&freeze() if $creating;
 		$widget->queue_draw;
 	}
 	# Горизонтальная направляющая
-	if($event->hardware_keycode == key_n2c($config->{"shortcuts"}->{"guide horizontal"})) {
+	elsif($event->hardware_keycode == key_n2c($config->{"shortcuts"}->{"guide horizontal"})) {
 		&guide(0);
 		$widget->queue_draw;
 	}
 	# Вертикальная направляющая
-	if($event->hardware_keycode == key_n2c($config->{"shortcuts"}->{"guide vertical"})) {
+	elsif($event->hardware_keycode == key_n2c($config->{"shortcuts"}->{"guide vertical"})) {
 		&guide(PI / 2);
 		$widget->queue_draw;
 	}
 	# Удаление
-	if($event->hardware_keycode == key_n2c($config->{"shortcuts"}->{"clear"})) {
+	elsif($event->hardware_keycode == key_n2c($config->{"shortcuts"}->{"clear"})) {
 		if(defined $idx{$type}) {
 			delete($all{${splice(@{$pack{$type}}, $idx{$type}, 1)}{id}});
 			$idx{$type} = undef;
@@ -536,7 +536,7 @@ sub key_release {
 		$widget->queue_draw;
 	}
 	# Удаление последнего
-	if($event->hardware_keycode == key_n2c($config->{"shortcuts"}->{"clear last"})) {
+	elsif($event->hardware_keycode == key_n2c($config->{"shortcuts"}->{"clear last"})) {
 		if(keys %all) {
 			my $x = delete($all{(sort keys %all)[-1]});
 			pop @{$pack{$$x->{type}}};
@@ -547,13 +547,13 @@ sub key_release {
 		}
 	}
 	# Удаление всех
-	if($event->hardware_keycode == key_n2c($config->{"shortcuts"}->{"clear all"})) {
+	elsif($event->hardware_keycode == key_n2c($config->{"shortcuts"}->{"clear all"})) {
 		undef @{$pack{$type}};
 		$idx{$type} = undef;
 		$widget->queue_draw;
 	}
 	# Скриншот
-	if($event->hardware_keycode == key_n2c($config->{"shortcuts"}->{"screenshot"})
+	elsif($event->hardware_keycode == key_n2c($config->{"shortcuts"}->{"screenshot"})
 	&& ($creating || defined $idx{m})) {
 		$sf = 1;
 		&clear();
@@ -564,48 +564,50 @@ sub key_release {
 		});
 	}
 	# Основной отрезок
-	if($event->hardware_keycode == key_n2c($config->{"shortcuts"}->{"segment line"})
+	elsif($event->hardware_keycode == key_n2c($config->{"shortcuts"}->{"segment line"})
 	&& ($creating || defined $idx{m})) {
 		my $S = $creating ? \%w : $m[$idx{m}];
 		$$S{marks}[0] = !$$S{marks}[0];
 		&motion;
 	}
 	# Линии по центру
-	if($event->hardware_keycode == key_n2c($config->{"shortcuts"}->{"center lines"})
+	elsif($event->hardware_keycode == key_n2c($config->{"shortcuts"}->{"center lines"})
 	&& ($creating || defined $idx{m})) {
 		my $S = $creating ? \%w : $m[$idx{m}];
 		$$S{marks}[1] = !$$S{marks}[1];
 		&motion;
 	}
 	# Золотое сечение
-	if($event->hardware_keycode == key_n2c($config->{"shortcuts"}->{"golden sections"})
+	elsif($event->hardware_keycode == key_n2c($config->{"shortcuts"}->{"golden sections"})
 	&& ($creating || defined $idx{m})) {
 		my $S = $creating ? \%w : $m[$idx{m}];
 		$$S{marks}[2] = !$$S{marks}[2];
 		&motion;
 	}
 	# Вспомогательные линии
-	if($event->hardware_keycode == key_n2c($config->{"shortcuts"}->{"only mask"})
+	elsif($event->hardware_keycode == key_n2c($config->{"shortcuts"}->{"only mask"})
 	&& ($creating || defined $idx{m})) {
 		my $S = $creating ? \%w : $m[$idx{m}];
 		$$S{onlymask} = !$$S{onlymask};
 		&motion;
 	}
-	# Цветовые схемы
-	while(my ($key, $value) = each %{$config->{"colors shortcuts"}}) {
-		if($event->hardware_keycode == key_n2c($value)
-		&& ($creating || defined $idx{$type})) {
-			my $S = $creating ? \%w : ${$pack{$type}}[$idx{$type}];
-			$$S{color} = [&set_colors($key)]->[2] if $type eq "g";
-			$$S{colors} = [&set_colors($key)] if $type eq "m";
-			&motion;
+	else {
+		# Цветовые схемы
+		while(my ($key, $value) = each %{$config->{"colors shortcuts"}}) {
+			if($event->hardware_keycode == key_n2c($value)
+			&& ($creating || defined $idx{$type})) {
+				my $S = $creating ? \%w : ${$pack{$type}}[$idx{$type}];
+				$$S{color} = [&set_colors($key)]->[2] if $type eq "g";
+				$$S{colors} = [&set_colors($key)] if $type eq "m";
+				&motion;
+			}
 		}
-	}
-	# Соотношение сторон
-	while(my ($key, $value) = each %{$config->{"aspect ratio shortcuts"}}) {
-		if($event->hardware_keycode == key_n2c($value)) {
-			$arm = eval($key);
-			&motion;
+		# Соотношение сторон
+		while(my ($key, $value) = each %{$config->{"aspect ratio shortcuts"}}) {
+			if($event->hardware_keycode == key_n2c($value)) {
+				$arm = eval($key);
+				&motion;
+			}
 		}
 	}
 }
