@@ -1,25 +1,28 @@
 common:
-   guides mode: inner
+   selection mode: inner
+guides:
+   snap distance: 10
 screenshot:
    target: both
    format: png
    file:   ~/screenshot_%Y_%m_%d_%H_%M_%S.png
 shortcuts:
-   quit:               Escape
-   fixed ratio:        Shift_L
-   from center:        Control_L
-   freeze:             f
-   guide horizontal:   g
-   guide vertical:     b
-   clear:              Delete
-   clear last:         BackSpace
-   clear all:          j
-   copy values:        space
-   screenshot:         s
-   segment line:       z
-   center lines:       x
-   golden sections:    c
-   only mask:          v
+   quit:             Escape
+   fixed ratio:      Shift_L
+   from center:      Control_L
+   freeze:           f
+   guide horizontal: g
+   guide vertical:   b
+   snap to guides:   backslash
+   clear:            Delete
+   clear last:       BackSpace
+   clear all:        j
+   copy values:      space
+   screenshot:       s
+   segment line:     z
+   center lines:     x
+   golden sections:  c
+   only mask:        v
 aspect ratio shortcuts:
    1:       q
    4/3:     w
