@@ -220,12 +220,6 @@ sub maskout_delta {
 sub key_n2c {
 	return Gtk2::Gdk::Keymap->get_entries_for_keyval(Gtk2::Gdk->keyval_from_name(shift))->{"keycode"};
 }
-sub fromcenter {
-	my ($x0, $y0, $x1, $y1) = @_;
-}
-sub fixedratio {
-	my ($x0, $y0, $x1, $y1) = @_;
-}
 sub calc_m {
 	my ($S, $x0, $y0, $x1, $y1, $fc, $fr) = @_;
 	$fc = $fromcenter if !defined $fc;
