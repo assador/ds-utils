@@ -1,7 +1,7 @@
 #!/usr/bin/perl
 #
 #  ds-collect, v1.0, CLI
-#  Copyright © 2016 Dmitry Sokolov
+#  Copyright © 2016-2017 Dmitry Sokolov
 #
 #  This program is free software: you can redistribute it and/or modify
 #  it under the terms of the GNU General Public License as published by
@@ -45,7 +45,7 @@
 #  Пример: ds-collect -r -e CP1251 -o /tmp/found.txt -t /tmp/change.txt \
 #                     -m '.*\.(?:css|html)' /var/www ~/onemore.css
 #
-#  Dmitry Sokolov <dmitry@scrofa-tridens.ru>
+#  Dmitry Sokolov <dmitry@sokolov.website>
 
 use strict;
 use warnings;

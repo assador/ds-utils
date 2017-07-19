@@ -1,7 +1,7 @@
 #!/usr/bin/perl
 #
 #  ds-measurer, v1.4, GTK+
-#  Copyright © 2016 Dmitry Sokolov
+#  Copyright © 2016-2017 Dmitry Sokolov
 #
 #  This file is part of ds-measurer.
 #
@@ -37,7 +37,7 @@
 #
 #  Ключей нет; запуск: ds-measurer
 #
-#  Dmitry Sokolov <dmitry@scrofa-tridens.ru>
+#  Dmitry Sokolov <dmitry@sokolov.website>
 
 use strict;
 use warnings;

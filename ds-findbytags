@@ -1,7 +1,7 @@
 #!/usr/bin/perl
 #
 #  ds-findbytags, v1.0, CLI / GTK+ 2
-#  Copyright © 2017 Dmitry Sokolov
+#  Copyright © 2016-2017 Dmitry Sokolov
 #
 #  This program is free software: you can redistribute it and/or modify
 #  it under the terms of the GNU General Public License as published by
@@ -24,7 +24,7 @@
 #  с оригинальными или случайными именами.
 #  Подробнее: http://sokolov.website/programs/ds-utils/ds-findbytags
 #
-#  Зависимости: perl
+#  Зависимости: perl, exiv2
 #  Рекомендуется: gtk2
 #
 #  ds-findbytags [-g] [-k]
@@ -56,7 +56,7 @@
 #                        -n "акулы, люди" -i "ах" -d "море" -c "чайки, птички" \
 #                        -l "no" -s "~/chosen" ~/photos1 ~/photos2
 #
-#  Dmitry Sokolov <sokolov@website>
+#  Dmitry Sokolov <dmitry@sokolov.website>
 
 use strict;
 use warnings;
@@ -123,7 +123,7 @@ sub begin {
 	}
 	my $tosave = 1; unless(exists $opts{s}) {$tosave = 0; $opts{s} = join("", map {$worden[int(rand scalar @worden)]} 1 .. 16);}
 	find(\&wanted, @dirs);
-	system("mkdir", $opts{s});
+	system("mkdir", $opts{s}) unless(-d $opts{s});
 	foreach(@files) {
 		system("ln", "-s", catfile($_->{path}, $_->{file}), catfile($opts{s}, exists $opts{k} ? $_->{file} : join("", map {$worden[int(rand scalar @worden)]} 1 .. 16) . join("", $_->{file} =~ /(\..*?)$/)));
 	}
