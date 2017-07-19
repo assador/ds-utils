@@ -1,0 +1,323 @@
+#!/usr/bin/perl
+#
+#  ds-findbytags, v1.0, CLI / GTK+ 2
+#  Copyright © 2017 Dmitry Sokolov
+#
+#  This program is free software: you can redistribute it and/or modify
+#  it under the terms of the GNU General Public License as published by
+#  the Free Software Foundation, either version 3 of the License, or
+#  (at your option) any later version.
+#
+#  This program is distributed in the hope that it will be useful,
+#  but WITHOUT ANY WARRANTY; without even the implied warranty of
+#  MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+#  GNU General Public License for more details.
+#
+#  You should have received a copy of the GNU General Public License
+#  along with this program.  If not, see <http://www.gnu.org/licenses/>.
+#
+#  Скрипт ищет в указанных каталогах изображения с ключевыми словами (тэгами),
+#  заданными в метаданных XMP или IPTC и удовлетворяющими заданным логическим
+#  условиям И, ИЛИ, НЕ. Опционально найденные изображения откроются в указанной
+#  программе. Попутно в найденных изображениях можно массово добавить, удалить
+#  или заменить тэги, сохранить ссылки на эти изображения в указанный каталог
+#  с оригинальными или случайными именами.
+#  Подробнее: http://sokolov.website/programs/ds-utils/ds-findbytags
+#
+#  Зависимости: perl
+#  Рекомендуется: gtk2
+#
+#  ds-findbytags [-g] [-k]
+#                [-a "тэг, тэг, ..."] [-o "тэг, тэг, ..."] [-n "тэг, тэг, ..."]
+#                [-i "тэг, тэг, ..."] [-d "тэг, тэг, ..."]
+#                [-c "тэг, тэг, [тэг, тэг], ..."] [-l просмотрщик]
+#                [-s путь_к_сохраняемым_ссылкам] путь(-и)_где_искать
+#
+#  -g  — от GUI     — при наличии ключа скрипт запускается в GTK-интерфейсе
+#                     вместо CLI-интерфейса
+#  -k  — от keep    — при наличии ключа ссылки именуются по именам найденных
+#                     файлов, при отсутствии ключа ссылки именуются случайным
+#                     набором символов
+#  -a  — от and     — при соответствии каждому из списка тэгов
+#  -o  — от or      — при соответствии любому из списка тэгов
+#  -n  — от not     — за исключением любого из списка тэгов
+#  -i  — от insert  — добавить тэги в найденные файлы
+#  -d  — от delete  — удалить тэги из найденных файлов
+#  -c  — от change  — заменить тэги в найденных файлах
+#  -l  — от look    — программа, в которой открывается каталог с найденными
+#                     изображениями; по умолчанию — Geeqie. Если не нужно
+#                     открывать его вообще, значение ключа должно быть no
+#  -s  — от save    — каталог (абсолютный путь), в котором сохраняются ссылки
+#                     на найденное после окончания работы скрипта; если ключ
+#                     не указан, создаётся временный каталог по месту запуска
+#                     скрипта, который после окончания его работы удаляется
+#
+#  Пример: ds-findbytags -k -a "море, серые тучки, камни" -o "чайки, дельфины" \
+#                        -n "акулы, люди" -i "ах" -d "море" -c "чайки, птички" \
+#                        -l "no" -s "~/chosen" ~/photos1 ~/photos2
+#
+#  Dmitry Sokolov <sokolov@website>
+
+use strict;
+use warnings;
+use utf8;
+use open qw/:encoding(UTF-8) :std/;
+use POSIX;
+use File::Find;
+use File::Spec::Functions;
+use Getopt::Std;
+
+my (@dirs, @files, %opts);
+my $exts = 'jpe?g|tiff?';
+my @worden = ('0' .. '9', 'A' .. 'Z', 'a' .. 'z');
+
+sub wanted {
+	if(-f && -s && /\.$exts$/) {
+		my @tags = `exiv2 -PXnt '$File::Find::name'` =~ /^subject\s*(?=\S)(.+)$/gm;
+		if(@tags != 0) {@tags = split /\s*,\s*/, $tags[0];} else {@tags = `exiv2 -PInt '$File::Find::name'` =~ /^Keywords\s*(?=\S)(.+)$/gm;}
+		if(
+			(exists $opts{a} ? @{(&jis(\@tags, $opts{a}))[1]} == scalar(@{$opts{a}}) : 1) &&
+			(exists $opts{o} ? @{(&jis(\@tags, $opts{o}))[1]} > 0 : 1) &&
+			(exists $opts{n} ? @{(&jis(\@tags, $opts{n}))[1]} == 0 : 1)
+		) {
+			if(exists $opts{d} || exists $opts{c} || exists $opts{i}) {
+				my %ntags = map {$_ => 1} @tags;
+				if(exists $opts{d}) {
+					foreach(@{$opts{d}}) {if($ntags{$_}) {delete $ntags{$_};}}
+				}
+				if(exists $opts{c}) {
+					foreach(@{$opts{c}}) {if($ntags{@{$_}[0]}) {delete $ntags{@{$_}[0]}; $ntags{@{$_}[1]} = 1;}}
+				}
+				if(exists $opts{i}) {
+					foreach(@{$opts{i}}) {$ntags{$_} = 1;}
+				}
+				my @ntags = keys %ntags;
+				`exiv2 -M"add Xmp.dc.subject" -M"del Iptc.Application2.Keywords" '$File::Find::name'`;
+				foreach(@ntags) {
+					`exiv2 -M"set Xmp.dc.subject XmpBag $_" -M"add Iptc.Application2.Keywords String $_" '$File::Find::name'`;
+				}
+			}
+			push @files, {path => $File::Find::dir, file => $_};
+		}
+	}
+}
+sub jis {
+	my ($a, $b) = @_;
+	my (@un, %un, @is, %is);
+	foreach(@$a, @$b) {$un{$_}++ && $is{$_}++}
+	@un = keys %un; @is = keys %is;
+	return (\@un, \@is);
+}
+sub begin {
+	$opts{a} = [split /\s*,\s*/, $opts{a}] if exists $opts{a};
+	$opts{o} = [split /\s*,\s*/, $opts{o}] if exists $opts{o};
+	$opts{n} = [split /\s*,\s*/, $opts{n}] if exists $opts{n};
+	$opts{i} = [split /\s*,\s*/, $opts{i}] if exists $opts{i};
+	$opts{d} = [split /\s*,\s*/, $opts{d}] if exists $opts{d};
+	if(exists $opts{c}) {
+		$opts{c} = [split /\s*,\s*/, $opts{c}];
+		die "Нечётное количество элементов в значении ключа -c\n" if @{$opts{c}} % 2;
+		for(my $i = 0; $i < @{$opts{c}} / 2; $i++) {
+			push @{$opts{c}}, [shift @{$opts{c}}, shift @{$opts{c}}];
+		}
+	}
+	my $tosave = 1; unless(exists $opts{s}) {$tosave = 0; $opts{s} = join("", map {$worden[int(rand scalar @worden)]} 1 .. 16);}
+	find(\&wanted, @dirs);
+	system("mkdir", $opts{s});
+	foreach(@files) {
+		system("ln", "-s", catfile($_->{path}, $_->{file}), catfile($opts{s}, exists $opts{k} ? $_->{file} : join("", map {$worden[int(rand scalar @worden)]} 1 .. 16) . join("", $_->{file} =~ /(\..*?)$/)));
+	}
+	system($opts{l}, $opts{s}) if $opts{l} ne "no";
+	system("rm", "-r", $opts{s}) if $tosave == 0;
+	@dirs = (); @files = (); %opts = ();
+}
+sub gtk {
+	use Gtk2 "-init";
+	use constant TRUE => 1;
+	use constant FALSE => 0;
+
+	our ($window, $tooltips, $vbox, $findin_frame, $findin_table, @findin_b, @findin_m, $findin_p, $search_frame, $search_table, $search_a_l, $search_a, $search_o_l, $search_o, $search_n_l, $search_n, $action_frame, $action_table, $action_i_l, $action_i, $action_d_l, $action_d, $action_c_l, $action_c, $hbox, $begin_savecb, $begin_savefc, $begin_keepcb, $begin_button);
+
+	sub gtk_begin {
+		$opts{k} = 1 if $begin_keepcb->get_active;
+		$opts{s} = $begin_savefc->get_filename if $begin_savecb->get_active;
+		$opts{a} = $search_a->get_text if $search_a->get_text =~ m/\S/;
+		$opts{o} = $search_o->get_text if $search_o->get_text =~ m/\S/;
+		$opts{n} = $search_n->get_text if $search_n->get_text =~ m/\S/;
+		$opts{i} = $action_i->get_text if $action_i->get_text =~ m/\S/;
+		$opts{d} = $action_d->get_text if $action_d->get_text =~ m/\S/;
+		$opts{c} = $action_c->get_text if $action_c->get_text =~ m/\S/;
+		@dirs = (); foreach(@findin_b) {push @dirs, $_->get_label;}
+		&begin() if @dirs > 0;
+	}
+	sub was_path {
+		my $p = shift;
+		foreach(@findin_b) {return 1 if $_->get_label eq $p;}
+		return 0;
+	}
+	sub choose_path {
+		my $p = shift;
+		my $c = Gtk2::FileChooserDialog->new("Искать в…", undef, "select-folder", "gtk-cancel" => "cancel", "gtk-ok" => "ok");
+		$c->set_current_folder($p);
+		$p = ("ok" eq $c->run) ? $c->get_current_folder : 0;
+		$c->destroy;
+		return $p;
+	}
+	sub add_path {
+		my $p = shift;
+		return 0 if &was_path($p);
+		$findin_b[scalar @findin_b] = Gtk2::Button->new($p);
+		$findin_m[scalar @findin_m] = Gtk2::Button->new("-");
+		$findin_b[-1]->signal_connect(clicked => sub {my $p_chosen = &choose_path($p); $_[0]->set_label($p_chosen) if $p_chosen && !&was_path($p_chosen);});
+		$findin_m[-1]->signal_connect(clicked => \&remove_path);
+		$findin_b[-1]->set_alignment(0, 0);
+		$findin_table->attach_defaults($findin_b[-1], 1, 2, $#findin_b, $#findin_b + 1);
+		$findin_table->attach($findin_m[-1], 2, 3, $#findin_m, $#findin_m + 1, ["shrink", "fill"], "fill", 0, 0);
+		$tooltips->set_tip($findin_m[-1], "Удалить путь для поиска: $p");
+		$findin_b[-1]->show;
+		$findin_m[-1]->show;
+	}
+	sub remove_path {
+		my $p = shift;
+		my $f = 0;
+		for(my $i = 0; $i < @findin_m; $i++) {
+			if($findin_m[$i] == $p) {
+				$findin_b[$i]->destroy; splice @findin_b, $i, 1;
+				$findin_m[$i]->destroy; splice @findin_m, $i, 1;
+				$f = 1;
+			}
+			if($f && $i < @findin_m) {
+				$findin_table->remove($findin_b[$i]); $findin_table->attach_defaults($findin_b[$i], 1, 2, $i, $i + 1);
+				$findin_table->remove($findin_m[$i]); $findin_table->attach($findin_m[$i], 2, 3, $i, $i + 1, ["shrink", "fill"], "fill", 0, 0);
+			}
+		}
+		$findin_table->set_property("n-rows", $findin_table->get_property("n-rows") - 1) if $findin_table->get_property("n-rows") > 1;
+	}
+
+	$window = Gtk2::Window->new;
+	$window->signal_connect(destroy => sub {Gtk2->main_quit;});
+	$window->set_title("FindByTags — Поиск картинок по тэгам и операции с тэгами найденных картинок");
+	$window->set_border_width(5);
+
+	$tooltips = Gtk2::Tooltips->new;
+
+	$vbox = Gtk2::VBox->new(FALSE, 5);
+	$window->add($vbox);
+
+	$findin_frame = Gtk2::Frame->new(" Искать в ");
+	$vbox->pack_start($findin_frame, FALSE, TRUE, 0);
+
+	$findin_table = Gtk2::Table->new(1, 3, FALSE);
+	$findin_table->set_border_width(5);
+	$findin_table->set_col_spacings(5);
+	$findin_frame->add($findin_table);
+
+	$findin_p = Gtk2::Button->new("+");
+	$findin_p->signal_connect(clicked => sub {my $p_chosen = &choose_path("."); &add_path($p_chosen) if $p_chosen;});
+	$findin_table->attach($findin_p, 0, 1, 0, 1, ["shrink", "fill"], "fill", 0, 0);
+	$tooltips->set_tip($findin_p, "Добавить новый путь для поиска");
+
+	$search_frame = Gtk2::Frame->new(" Поиск по тэгам ");
+	$vbox->pack_start($search_frame, FALSE, TRUE, 0);
+
+	$search_table = Gtk2::Table->new(3, 2, FALSE);
+	$search_table->set_border_width(5);
+	$search_table->set_col_spacings(5);
+	$search_frame->add($search_table);
+
+	$search_a_l = Gtk2::Label->new("Присутствуют все тэги из:");
+	$search_a_l->set_alignment(1, 0.5);
+	$search_table->attach($search_a_l, 0, 1, 0, 1, ["shrink", "fill"], "fill", 0, 0);
+
+	$search_a = Gtk2::Entry->new;
+	$search_table->attach_defaults($search_a, 1, 2, 0, 1);
+	$tooltips->set_tip($search_a, "Поиск ведётся по файлам, в которых\nПРИСУТСТВУЮТ ВСЕ\nиз перечисленных здесь тэгов (разделённых запятыми)");
+	$search_a->set_text($opts{a}) if exists $opts{a};
+
+	$search_o_l = Gtk2::Label->new("Присутствует хотя бы один тэг из:");
+	$search_o_l->set_alignment(1, 0.5);
+	$search_table->attach($search_o_l, 0, 1, 1, 2, ["shrink", "fill"], "fill", 0, 0);
+
+	$search_o = Gtk2::Entry->new;
+	$search_table->attach_defaults($search_o, 1, 2, 1, 2);
+	$tooltips->set_tip($search_o, "Поиск ведётся по файлам, в которых\nПРИСУТСТВУЕТ ХОТЯ БЫ ОДИН\nиз перечисленных здесь тэгов (разделённых запятыми)");
+	$search_o->set_text($opts{o}) if exists $opts{o};
+
+	$search_n_l = Gtk2::Label->new("Нет ни одного тэга из:");
+	$search_n_l->set_alignment(1, 0.5);
+	$search_table->attach($search_n_l, 0, 1, 2, 3, ["shrink", "fill"], "fill", 0, 0);
+
+	$search_n = Gtk2::Entry->new;
+	$search_table->attach_defaults($search_n, 1, 2, 2, 3);
+	$tooltips->set_tip($search_n, "Поиск ведётся по файлам, в которых\nНЕТ НИ ОДНОГО\nиз перечисленных здесь тэгов (разделённых запятыми)");
+	$search_n->set_text($opts{n}) if exists $opts{n};
+
+	$action_frame = Gtk2::Frame->new(" Действия с найденным ");
+	$vbox->pack_start($action_frame, FALSE, TRUE, 0);
+
+	$action_table = Gtk2::Table->new(3, 2, FALSE);
+	$action_table->set_border_width(5);
+	$action_table->set_col_spacings(5);
+	$action_frame->add($action_table);
+
+	$action_i_l = Gtk2::Label->new("Добавить тэги в найденные файлы:");
+	$action_i_l->set_alignment(1, 0.5);
+	$action_table->attach($action_i_l, 0, 1, 0, 1, ["shrink", "fill"], "fill", 0, 0);
+
+	$action_i = Gtk2::Entry->new;
+	$action_table->attach_defaults($action_i, 1, 2, 0, 1);
+	$tooltips->set_tip($action_i, "ДОБАВИТЬ в найденные файлы перечисленные здесь тэги (разделённые запятыми)");
+	$action_i->set_text($opts{i}) if exists $opts{i};
+
+	$action_d_l = Gtk2::Label->new("Удалить тэги из найденных файлов:");
+	$action_d_l->set_alignment(1, 0.5);
+	$action_table->attach($action_d_l, 0, 1, 1, 2, ["shrink", "fill"], "fill", 0, 0);
+
+	$action_d = Gtk2::Entry->new;
+	$action_table->attach_defaults($action_d, 1, 2, 1, 2);
+	$tooltips->set_tip($action_d, "УДАЛИТЬ из найденных файлов перечисленные здесь тэги (разделённые запятыми)");
+	$action_d->set_text($opts{d}) if exists $opts{d};
+
+	$action_c_l = Gtk2::Label->new("Заменить тэги в найденных файлах:");
+	$action_c_l->set_alignment(1, 0.5);
+	$action_table->attach($action_c_l, 0, 1, 2, 3, ["shrink", "fill"], "fill", 0, 0);
+
+	$action_c = Gtk2::Entry->new;
+	$action_table->attach_defaults($action_c, 1, 2, 2, 3);
+	$tooltips->set_tip($action_c, "ЗАМЕНИТЬ в найденных файлах одни тэги на другие. Тэги перечисляются в этом поле попарно через запятые. Например, если ввести в это поле [овсянка, борщ, лада калина, мотоцикл], то в найденных файлах тэг «овсянка» заменится на «борщ», а тэг «лада калина» заменится на «мотоцикл».");
+	$action_c->set_text($opts{c}) if exists $opts{c};
+
+	$hbox = Gtk2::HBox->new(FALSE, 5);
+	$vbox->pack_end($hbox, FALSE, TRUE, 0);
+
+	$begin_savecb = Gtk2::CheckButton->new("Сохранять ссылки в:");
+	$begin_savecb->signal_connect(toggled => sub {$begin_savefc->set_sensitive($begin_savecb->get_active); $begin_keepcb->set_sensitive($begin_savecb->get_active);});
+	$hbox->pack_start($begin_savecb, FALSE, FALSE, 0);
+	$tooltips->set_tip($begin_savecb, "Если отмечено, в выбранном правее каталоге сохраняются символические ссылки на найденные файлы. Это может быть удобно для составления альбомов.");
+
+	$begin_savefc = Gtk2::FileChooserButton->new("Сохранять ссылки в…", "select-folder");
+	$begin_savefc->set_sensitive(FALSE);
+	$hbox->pack_start($begin_savefc, FALSE, FALSE, 0);
+	$tooltips->set_tip($begin_savefc, "Каталог, в котором сохраняются символические ссылки на найденные файлы.");
+
+	$begin_keepcb = Gtk2::CheckButton->new("Сохранять имена");
+	$begin_keepcb->set_sensitive(FALSE);
+	$hbox->pack_start($begin_keepcb, FALSE, FALSE, 0);
+	$tooltips->set_tip($begin_keepcb, "Если отмечено, символические ссылки на найденные файлы сохраняются с именами самих файлов. В противном случае ссылки получают случайные имена. Ставьте эту галочку только если уверены, что все найденные файлы имеют уникальные имена.");
+
+	$begin_button = Gtk2::Button->new("Начать");
+	$begin_button->signal_connect(clicked => \&gtk_begin);
+	$hbox->pack_end($begin_button, FALSE, FALSE, 0);
+	$tooltips->set_tip($begin_button, "Начать поиск (и операции с найденными файлами, если они заданы). Поиск может продолжаться довольно долго, если происходит по большому количеству файлов.");
+
+	$window->show_all;
+	for(my $i = 0; $i < @dirs; $i++) {&add_path($dirs[$i]);}
+	$begin_keepcb->set_active(TRUE) if exists $opts{k};
+	if(exists $opts{s}) {$begin_savecb->set_active(TRUE); $begin_savefc->set_filename($opts{s});}
+	Gtk2->main;
+}
+
+getopts('gka:o:n:i:d:c:l:s:', \%opts); @dirs = @ARGV;
+$opts{l} = "geeqie" unless exists $opts{l} or $opts{l} ne "no";
+if(exists $opts{g}) {&gtk();} else {die "Не выбраны пути для поиска\n" if @dirs == 0; &begin();}
+exit 0;
