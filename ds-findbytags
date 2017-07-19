@@ -127,7 +127,7 @@ sub begin {
 	foreach(@files) {
 		system("ln", "-s", catfile($_->{path}, $_->{file}), catfile($opts{s}, exists $opts{k} ? $_->{file} : join("", map {$worden[int(rand scalar @worden)]} 1 .. 16) . join("", $_->{file} =~ /(\..*?)$/)));
 	}
-	system($opts{l}, $opts{s}) if $opts{l} ne "no";
+	system($opts{l}, $opts{s}) if exists $opts{l} and $opts{l} ne "no";
 	system("rm", "-r", $opts{s}) if $tosave == 0;
 	@dirs = (); @files = (); %opts = ();
 }
@@ -318,6 +318,6 @@ sub gtk {
 }
 
 getopts('gka:o:n:i:d:c:l:s:', \%opts); @dirs = @ARGV;
-$opts{l} = "geeqie" unless exists $opts{l} or $opts{l} ne "no";
+$opts{l} = "geeqie" unless exists $opts{l} and $opts{l} ne "no";
 if(exists $opts{g}) {&gtk();} else {die "Не выбраны пути для поиска\n" if @dirs == 0; &begin();}
 exit 0;
