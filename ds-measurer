@@ -1,6 +1,6 @@
 #!/usr/bin/perl
 #
-#  ds-measurer, v1.4, GTK+
+#  ds-measurer, v1.4.1, GTK+
 #  Copyright © 2016-2017 Dmitry Sokolov
 #
 #  This file is part of ds-measurer.
@@ -683,9 +683,8 @@ sub key_release {
 	else {
 		# Цветовые схемы
 		while(my ($key, $value) = each %{$config->{"colors shortcuts"}}) {
-			if($event->hardware_keycode == key_n2c($value)
-			&& ($creating || defined $idx{$type})) {
-				my $S = $creating ? \%w : ${$pack{$type}}[$idx{$type}];
+			if($event->hardware_keycode == key_n2c($value)) {
+				my $S = defined $idx{$type} ? ${$pack{$type}}[$idx{$type}] : \%w;
 				$$S{color} = [&set_colors($key)]->[2] if $type eq "g";
 				$$S{colors} = [&set_colors($key)] if $type eq "m";
 				&motion;
