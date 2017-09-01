@@ -1,0 +1,146 @@
+#!/usr/bin/perl
+#
+#  ds-findorphaned, v1.0, CLI
+#  Copyright © 2016-2017 Dmitry Sokolov
+#
+#  This program is free software: you can redistribute it and/or modify
+#  it under the terms of the GNU General Public License as published by
+#  the Free Software Foundation, either version 3 of the License, or
+#  (at your option) any later version.
+#
+#  This program is distributed in the hope that it will be useful,
+#  but WITHOUT ANY WARRANTY; without even the implied warranty of
+#  MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+#  GNU General Public License for more details.
+#
+#  You should have received a copy of the GNU General Public License
+#  along with this program.  If not, see <http://www.gnu.org/licenses/>.
+#
+#  Скрипт ищет в файлах, находящихся в указанных каталогах и с именами,
+#  соответствующими указанному регулярному выражению, упоминания файлов,
+#  находящихся в других указанных каталогах и с именами, соответствующими
+#  другому указанному регулярному выражению, и выводит список тех файлов,
+#  которые не упоминаются ни в одном из тех, по которым ведётся поиск.
+#  Опционально их также можно удалить.
+#
+#  Зависимости: perl
+#  Рекомендуется: enca
+#
+#  ds-findorphaned [-p] [-r]  [-R] [-e кодировка] [-l лог-файл]
+#                  [-d 'каталог[, каталог…]'] [-f 'маска']
+#                  [-D 'каталог[, каталог…]'] [-F 'маска']
+#
+#  -p  — от print        — Только перечислить файлы.
+#                          (по умолчанию также выводится суммирующая информация
+#                          и предлагается удаление осиротевших файлов).
+#  -e  — от encoding     — Кодировка читаемых файлов.
+#                          (по умолчанию — * — автоопределение с помощью enca).
+#  -d  — от directories  — Каталоги, на упоминание файлов в которых идёт проверка
+#                          (через запятую, по умолчанию — .).
+#  -r  — от recursive    — Анализировать рекурсивно каталоги, на упоминание
+#                          файлов в которых идёт проверка (по умолчанию — нет).
+#  -f  — от files        — Регулярное выражение имён файлов, на упоминание
+#                          которых идёт проверка (по умолчанию — .*).
+#  -D  — от directories  — Каталоги, в которых идёт проверка
+#                          (через запятую, по умолчанию — .).
+#  -R  — от recursive    — Анализировать рекурсивно каталоги,
+#                          в которых идёт проверка (по умолчанию — нет).
+#  -F  — от files        — Регулярное выражение имён файлов,
+#                          в которых идёт проверка (по умолчанию — .*).
+#  -l  — от log          — Создаваемый лог-файл
+#                          (по умолчанию не создаётся, а пишется на stdout).
+#
+#  Пример: ds-findorphaned -prR -e "CP1251" -l "~/log.txt" \
+#                          -d "~/maybe_orphaned_images" -f ".*\.jpg$" \
+#                          -D "~/search_here, ~/and_here" -F ".*\.php$"
+#
+#  Результатом примера будет поиск во всех .php-файлах, находящихся
+#  в ~/search_here и ~/and_here (рекурсивно) на упоминание .jpg-файлов,
+#  находящихся в ~/maybe_orphaned_images (рекурсивно).
+#
+#  Dmitry Sokolov <dmitry@sokolov.website>
+
+use strict;
+use warnings;
+use utf8;
+use open qw/:encoding(UTF-8) :std/;
+use POSIX;
+use Cwd qw/getcwd abs_path/;
+use File::Find;
+use Getopt::Std;
+use Encode;
+
+my (%opts, @notOrphaned, @isOrphaned, $opte, $inner, $mess, $decision, $log);
+
+sub wantedForFiles {
+	if(!$inner) {$inner = 1; return;}
+	$File::Find::prune = 1 if !$File::Find::prune && !(exists $opts{r});
+	push @isOrphaned, $_ if(-f && $_ =~ m/$opts{f}/);
+}
+sub wantedInFiles {
+	if(!$inner) {$inner = 1; return;}
+	$File::Find::prune = 1 if !$File::Find::prune && !(exists $opts{R});
+	if(-f && -s && $_ =~ m/$opts{F}/) {
+		my $source = undef;
+		if($opts{e} eq '*') {$opte = `enca -r '$_'` || "UTF-8"; chomp $opte;}
+			else {$opte = $opts{e};}
+		open(IN, "<:encoding($opte)", $File::Find::name)
+			or die "Can’t open $File::Find::name: $!\n";
+		while($_ = <IN>) {$source .= $_;}
+		close(IN);
+		for(my $i = 0; $i < $#isOrphaned; $i++) {
+			push(@notOrphaned, splice(@isOrphaned, $i, 1))
+				if $source =~ /$isOrphaned[$i]/gms;
+		}
+	}
+}
+
+getopts('prRe:d:f:D:F:l:', \%opts);
+$opts{e} = '*' unless exists $opts{e};
+$opts{d} = exists $opts{d} ? [split(/\s*,\s*/, $opts{d})] : [abs_path(getcwd)];
+$opts{D} = exists $opts{D} ? [split(/\s*,\s*/, $opts{D})] : [abs_path(getcwd)];
+$opts{f} = '.*' unless exists $opts{f};
+$opts{F} = '.*' unless exists $opts{F};
+
+foreach(@{$opts{d}}) {
+	if(-d && -s) {$inner = 0; find(\&wantedForFiles, abs_path($_));}
+}
+foreach(@{$opts{D}}) {
+	if(-d && -s) {$inner = 0; find(\&wantedInFiles, abs_path($_));}
+}
+if(!exists $opts{p}) {
+	$mess =
+		scalar(@isOrphaned) + scalar(@notOrphaned) .
+		" files found with mask /$opts{f}/ in director" .
+		(scalar(@{$opts{d}}) > 1 ? "ies" : "y") . " " .
+		join(", ", @{$opts{d}}) . "\n" .
+		scalar(@isOrphaned) .
+		" of them are not mentioned in any of the files with mask /$opts{F}/ in director" .
+		(scalar(@{$opts{D}}) > 1 ? "ies" : "y") . " " .
+		join(", ", @{$opts{D}}) . "\n";
+	if(exists $opts{l}) {
+		$log .= $mess;
+		$log .= "List of unmentioned files:\n" . "-" x 80 . "\n" if @isOrphaned;
+	}
+}
+foreach(@isOrphaned) {print "$_\n"; $log .= "$_\n" if exists $opts{l};}
+if(exists $opts{l} && $log) {
+	open(LOG, ">:encoding(UTF-8)", $opts{l})
+		or print "Can’t write log in file $opts{l}: $!\n" and return;
+	print LOG $log;
+	close(LOG);
+}
+if(!exists $opts{p}) {
+	print "-" x 80 . "\n" . $mess;
+	if(@isOrphaned) {
+		print "Above there is a list of unmentioned files. Delete these files? (Yes/No): ";
+		chomp($decision = <STDIN>);
+		if($decision eq "Yes") {
+			unlink @isOrphaned or die "Can’t delete files: $!\n";
+			print "Files have been deleted.\n";
+		} else {
+			print "Files have not been deleted.\n";
+		}
+	}
+}
+exit 0;
