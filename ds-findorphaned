@@ -1,6 +1,6 @@
 #!/usr/bin/perl
 #
-#  ds-findorphaned, v1.0, CLI
+#  ds-findorphaned, v1.0.1, CLI
 #  Copyright © 2016-2017 Dmitry Sokolov
 #
 #  This program is free software: you can redistribute it and/or modify
@@ -35,8 +35,8 @@
 #                          и предлагается удаление осиротевших файлов).
 #  -e  — от encoding     — Кодировка читаемых файлов
 #                          (по умолчанию — * — автоопределение с помощью enca).
-#  -d  — от directories  — Каталоги, на упоминание файлов в которых идёт проверка
-#                          (через запятую, по умолчанию — .).
+#  -d  — от directories  — Каталоги, на упоминание файлов в которых
+#                          идёт проверка (через запятую, по умолчанию — .).
 #  -r  — от recursive    — Анализировать рекурсивно каталоги, на упоминание
 #                          файлов в которых идёт проверка (по умолчанию — нет).
 #  -f  — от files        — Регулярное выражение имён файлов, на упоминание
@@ -75,12 +75,13 @@ my (%opts, @notOrphaned, @isOrphaned, $opte, $inner, $mess, $decision, $log);
 sub wantedForFiles {
 	if(!$inner) {$inner = 1; return;}
 	$File::Find::prune = 1 if !$File::Find::prune && !(exists $opts{r});
-	push @isOrphaned, $_ if(-f && $_ =~ m/$opts{f}/);
+	push @isOrphaned, {name => $_, path => $File::Find::name}
+		if(-f && $_ =~ m/$opts{f}/);
 }
 sub wantedInFiles {
 	if(!$inner) {$inner = 1; return;}
 	$File::Find::prune = 1 if !$File::Find::prune && !(exists $opts{R});
-	if(-f && -s && $_ =~ m/$opts{F}/) {
+	if(-f && -s && -T && $_ =~ m/$opts{F}/) {
 		my $source = undef;
 		if($opts{e} eq '*') {$opte = `enca -r '$_'` || "UTF-8"; chomp $opte;}
 			else {$opte = $opts{e};}
@@ -88,9 +89,11 @@ sub wantedInFiles {
 			or die "Can’t open $File::Find::name: $!\n";
 		while($_ = <IN>) {$source .= $_;}
 		close(IN);
-		for(my $i = 0; $i < $#isOrphaned; $i++) {
-			push(@notOrphaned, splice(@isOrphaned, $i, 1))
-				if $source =~ /$isOrphaned[$i]/gms;
+		for(my $i = 0; $i < @isOrphaned; $i++) {
+			if($source =~ m/\b\Q$isOrphaned[$i]->{name}\E\b/gms) {
+				push(@notOrphaned, splice(@isOrphaned, $i, 1));
+				$i = $i - 2;
+			}
 		}
 	}
 }
@@ -115,15 +118,18 @@ if(!exists $opts{p}) {
 		(scalar(@{$opts{d}}) > 1 ? "ies" : "y") . " " .
 		join(", ", @{$opts{d}}) . "\n" .
 		scalar(@isOrphaned) .
-		" of them are not mentioned in any of the files with mask /$opts{F}/ in director" .
-		(scalar(@{$opts{D}}) > 1 ? "ies" : "y") . " " .
+		" of them are not mentioned in any of the files with mask /$opts{F}/ " .
+		"in director" . (scalar(@{$opts{D}}) > 1 ? "ies" : "y") . " " .
 		join(", ", @{$opts{D}}) . "\n";
 	if(exists $opts{l}) {
 		$log .= $mess;
 		$log .= "List of unmentioned files:\n" . "-" x 80 . "\n" if @isOrphaned;
 	}
 }
-foreach(@isOrphaned) {print "$_\n"; $log .= "$_\n" if exists $opts{l};}
+foreach(@isOrphaned) {
+	print "$_->{path}\n";
+	$log .= "$_->{path}\n" if exists $opts{l};
+}
 if(exists $opts{l} && $log) {
 	open(LOG, ">:encoding(UTF-8)", $opts{l})
 		or print "Can’t write log in file $opts{l}: $!\n" and return;
@@ -133,10 +139,14 @@ if(exists $opts{l} && $log) {
 if(!exists $opts{p}) {
 	print "-" x 80 . "\n" . $mess;
 	if(@isOrphaned) {
-		print "Above there is a list of unmentioned files. Delete these files? (Yes/No): ";
+		print
+			"Above there is a list of unmentioned files. " .
+			"Delete these files? (Yes/No): ";
 		chomp($decision = <STDIN>);
 		if($decision eq "Yes") {
-			unlink @isOrphaned or die "Can’t delete files: $!\n";
+			foreach(@isOrphaned) {
+				unlink "$_->{path}" or die "Can’t delete file: $!\n";
+			}
 			print "Files have been deleted.\n";
 		} else {
 			print "Files have not been deleted.\n";
