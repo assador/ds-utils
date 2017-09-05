@@ -1,6 +1,6 @@
 #!/usr/bin/perl
 #
-#  ds-findbytags, v1.1.1, CLI / GTK+ 2
+#  ds-findbytags, v1.1.2, CLI / GTK+ 2
 #  Copyright © 2016-2017 Dmitry Sokolov
 #
 #  This program is free software: you can redistribute it and/or modify
@@ -117,13 +117,17 @@ sub wanted {
 					}
 				}
 				my @ntags = keys %ntags;
-				`exiv2 -M"add Xmp.dc.subject" ` .
-				`-M"del Iptc.Application2.Keywords" ` .
-				`'$File::Find::name'`;
+				my $do =
+					"exiv2 -M\"add Xmp.dc.subject\" " .
+					"-M\"del Iptc.Application2.Keywords\" " .
+					"\'$File::Find::name\'";
+				`$do`;
 				foreach(@ntags) {
-					`exiv2 -M"set Xmp.dc.subject XmpBag $_" ` .
-					`-M"add Iptc.Application2.Keywords String $_" ` .
-					`'$File::Find::name'`;
+					my $do =
+						"exiv2 -M\"set Xmp.dc.subject XmpBag $_\" " .
+						"-M\"add Iptc.Application2.Keywords String $_\" " .
+						"\'$File::Find::name\'";
+					`$do`;
 				}
 			}
 			push @files, {path => $File::Find::dir, file => $_};
