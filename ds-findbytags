@@ -1,6 +1,6 @@
 #!/usr/bin/perl
 #
-#  ds-findbytags, v1.1.3, CLI / GTK+ 2
+#  ds-findbytags, v1.1.4, CLI / GTK+ 2
 #  Copyright © 2016-2017 Dmitry Sokolov
 #
 #  This program is free software: you can redistribute it and/or modify
@@ -72,6 +72,7 @@ use warnings;
 use utf8;
 use open qw/:encoding(UTF-8) :std/;
 use POSIX;
+use Cwd qw/abs_path/;
 use File::Find;
 use File::Spec::Functions;
 use Getopt::Std;
@@ -620,6 +621,7 @@ sub gtk {
 
 getopts("gka:o:n:i:d:c:l:s:t:e:", \%opts);
 @dirs = @ARGV;
+foreach(@dirs) {$_ = abs_path $_;}
 $opts{t} = $ENV{HOME} . "/.config/geeqie/geeqierc.xml" unless exists $opts{t};
 $opts{e} = "*" unless exists $opts{e};
 $opts{l} = "geeqie" unless exists $opts{l} and $opts{l} ne "no";

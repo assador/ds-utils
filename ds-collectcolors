@@ -1,6 +1,6 @@
 #!/usr/bin/perl
 #
-#  ds-collectcolors, v1.0, CLI
+#  ds-collectcolors, v1.0.1, CLI
 #  Copyright © 2016-2017 Dmitry Sokolov
 #
 #  This program is free software: you can redistribute it and/or modify
@@ -57,7 +57,9 @@ use Getopt::Std;
 use Encode;
 
 my (@result, @dirs, $opte, %opts, $mask);
-my ($inner, $output, $template) = (0, "GIMP Palette\nName: colors_collected.gpl\nColumns: 0\n#\n", "");
+my $output = "GIMP Palette\nName: colors_collected.gpl\nColumns: 0\n#\n";
+my $template = "";
+my $inner = 0;
 my @sample = (
 	'(?<!&)#([0-9a-fA-F]{6})\b',
 	'(?<!&)#([0-9a-fA-F]{3})\b',
@@ -67,8 +69,10 @@ my @sample = (
 sub collect_in_file {
 	my $file = shift;
 	my $source = undef;
-	if($opts{e} eq '*') {$opte = `enca -r '$file'` || "UTF-8"; chomp $opte;} else {$opte = $opts{e};}
-	open(IN, "<:encoding($opte)", $file) or die "Can’t open $file: $!\n";
+	if($opts{e} eq '*') {$opte = `enca -r '$file'` || "UTF-8"; chomp $opte;}
+		else {$opte = $opts{e};}
+	open(IN, "<:encoding($opte)", $file)
+		or print "Can’t open $file: $!\n" and return;
 	while($_ = <IN>) {$source .= $_;}
 	close(IN);
 	for(my $i = 0; $i < scalar @sample; $i++) {
@@ -76,17 +80,30 @@ sub collect_in_file {
 		$s =~ s/\\(\d+)/'\\'.($1+1)/ge;
 		while($source =~ m/($s)/g) {
 			for(my $y = 0; $y <= scalar @result; $y++) {
-				if(scalar @result == 0 || ($y == $#result && $1 ne $result[$y]->{orig})) {
+				if(scalar @result == 0
+				|| ($y == $#result && $1 ne $result[$y]->{orig})) {
 					my $val = $2;
-					if($i == 1) {$val =~ s/(.)/$1$1/g;}
-					if($i == 0 || $i == 1) {$val = join("\t", map $_, unpack "C*", pack "H*", $val);}
-					if($i == 2) {$val = join("\t", $val =~ /^\D*(\d+)\D+(\d+)\D+(\d+)/g);}
-					$result[++$#result] = {orig => $1, conv => $val, pths => [$file], wght => 1};
+					if($i == 1) {
+						$val =~ s/(.)/$1$1/g;
+					}
+					if($i == 0 || $i == 1) {
+						$val = join("\t", map $_, unpack "C*", pack "H*", $val);
+					}
+					if($i == 2) {
+						$val = join("\t", $val =~ /^\D*(\d+)\D+(\d+)\D+(\d+)/g);
+					}
+					$result[++$#result] = {
+						orig => $1,
+						conv => $val,
+						pths => [$file],
+						wght => 1
+					};
 					last;
 				}
 				if(scalar @result != 0 && $1 eq $result[$y]->{orig}) {
 					$result[$y]->{wght}++;
-					$result[$y]->{pths}->[++$#{$result[$y]->{pths}}] = $file unless $file ~~ @{$result[$y]->{pths}};
+					$result[$y]->{pths}->[++$#{$result[$y]->{pths}}] = $file
+						unless $file ~~ @{$result[$y]->{pths}};
 					last;
 				}
 			}
@@ -97,7 +114,7 @@ sub collect_in_file {
 sub wanted {
 	if(!$inner) {$inner = 1; return;}
 	$File::Find::prune = 1 if !$File::Find::prune && !(exists $opts{r});
-	if(-f && -s && $_ =~ $mask) {&collect_in_file($File::Find::name);}
+	if(-f && -s && -T && $_ =~ $mask) {&collect_in_file($File::Find::name);}
 }
 
 getopts('re:o:t:m:', \%opts);
@@ -108,7 +125,8 @@ $mask = exists $opts{m} ? qr/$opts{m}/ : qr/.+/;
 @dirs = @ARGV ? @ARGV : ('.');
 foreach(@dirs) {
 	my $fullname = decode("UTF-8", File::Spec->rel2abs($_));
-	if(-f && -s && $_ =~ $mask) {&collect_in_file($fullname);} else {$inner = 0; find(\&wanted, $fullname);}
+	if(-f && -s && -T && $_ =~ $mask) {&collect_in_file($fullname);}
+		else {$inner = 0; find(\&wanted, $fullname);}
 }
 foreach(sort {$b->{wght} <=> $a->{wght}} @result) {
 	$output .=
@@ -123,10 +141,8 @@ foreach(sort {$b->{wght} <=> $a->{wght}} @result) {
 		"'" . join("', '", @{$_->{pths}}) . "'" .
 		"\n";
 }
-open(OUT, ">:encoding(UTF-8)", $opts{o}) or die "Can’t create $opts{o}: $!\n";
-print OUT $output;
-close(OUT);
-open(OUT, ">:encoding(UTF-8)", $opts{t}) or die "Can’t create $opts{t}: $!\n";
-print OUT $template;
-close(OUT);
+if(open(OUT, ">:encoding(UTF-8)", $opts{o})) {print OUT $output; close(OUT);}
+	else {print "Can’t create $opts{o}: $!\n";}
+if(open(OUT, ">:encoding(UTF-8)", $opts{t})) {print OUT $template; close(OUT);}
+	else {print "Can’t create $opts{t}: $!\n";}
 exit 0;

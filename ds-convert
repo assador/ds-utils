@@ -1,6 +1,6 @@
 #!/usr/bin/perl
 #
-#  ds-convert, v1.0, CLI
+#  ds-convert, v1.0.1, CLI
 #  Copyright © 2016-2017 Dmitry Sokolov
 #
 #  This program is free software: you can redistribute it and/or modify
@@ -63,15 +63,19 @@ $opts{e} = [split(/\s*,\s*/, $opts{e})];
 @templates = @ARGV ? @ARGV : ('./colors_templated.cot');
 foreach(@templates) {
 	my $fullname = decode("UTF-8", File::Spec->rel2abs($_));
-	if(-f && -s) {
-		open(IN, "<:encoding(UTF-8)", $fullname) or die "Can’t open $fullname: $!\n";
+	if(-f && -s && -T && open(IN, "<:encoding(UTF-8)", $fullname)) {
 		while(local $_ = <IN>) {
 			$_ =~ /^(.+?)\s*\t+(.+?)\s*\t+\s*\'?\s*(.+?)\s*\'?\s*$/;
 			if($1 ne $2) {
 				foreach my $path (split(/\s*\'?\s*,\s*\'?\s*/, $3)) {
 					for(my $i = 0; $i <= scalar @paths; $i++) {
-						if(scalar @paths == 0 || ($i == $#paths && $path ne $paths[$i]->{path})) {
-							$paths[++$#paths] = {path => $path, chns => [$1], orgs => [$2]};
+						if(scalar @paths == 0
+						|| ($i == $#paths && $path ne $paths[$i]->{path})) {
+							$paths[++$#paths] = {
+								path => $path,
+								chns => [$1],
+								orgs => [$2]
+							};
 							last;
 						}
 						if(scalar @paths != 0 && $path eq $paths[$i]->{path}) {
@@ -86,22 +90,35 @@ foreach(@templates) {
 			}
 		}
 		close(IN);
+	} else {
+		print "Can’t open $fullname: $!\n";
 	}
 }
 foreach my $path (@paths) {
 	my $source = undef;
-	if($opts{e}->[0] eq '*') {$opte[0] = `enca -r '$path->{path}'` || "UTF-8"; chomp $opte[0];} else {$opte[0] = $opts{e}->[0];}
-	open(IN, "<:encoding($opte[0])", $path->{path}) or print "Can’t open $path->{path}: $!\n" and return;
+	if($opts{e}->[0] eq '*') {
+		$opte[0] = `enca -r '$path->{path}'` || "UTF-8"; chomp $opte[0];
+	} else {
+		$opte[0] = $opts{e}->[0];
+	}
+	open(IN, "<:encoding($opte[0])", $path->{path})
+		or print "Can’t open $path->{path}: $!\n" and next;
 	while(local $_ = <IN>) {$source .= $_;}
 	close(IN);
 	for(my $i = 0; $i < @{$path->{orgs}}; $i++) {
-		if($source =~ s/\Q$path->{orgs}->[$i]\E/$path->{chns}->[$i]/g) {$changed = 1;}
+		if($source =~ s/\Q$path->{orgs}->[$i]\E/$path->{chns}->[$i]/g) {
+			$changed = 1;
+		}
 	}
 	if($changed) {
 		$changed = 0;
-		copy($path->{path}, $path->{path} . "~") or print "Can’t make backup of $path->{path}: $!\n" if exists $opts{b};
-		if($opts{e}->[1] eq '*') {$opte[1] = $opte[0]} else {$opte[1] = $opts{e}->[1];}
-		open(OUT, ">:encoding($opte[1])", $path->{path}) or print "Can’t open to write $path->{path}: $!\n" and return;
+		copy($path->{path}, $path->{path} . "~")
+			or print "Can’t make backup of $path->{path}: $!\n" and next
+			if exists $opts{b};
+		if($opts{e}->[1] eq '*') {$opte[1] = $opte[0]}
+			else {$opte[1] = $opts{e}->[1];}
+		open(OUT, ">:encoding($opte[1])", $path->{path})
+			or print "Can’t open to write $path->{path}: $!\n" and next;
 		print OUT $source;
 		close(OUT);
 	}
