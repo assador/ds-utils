@@ -132,7 +132,7 @@ foreach(@isOrphaned) {
 }
 if(exists $opts{l} && $log) {
 	open(LOG, ">:encoding(UTF-8)", $opts{l})
-		or print "Can’t write log in file $opts{l}: $!\n" and return;
+		or print "Can’t write log in file $opts{l}: $!\n";
 	print LOG $log;
 	close(LOG);
 }
