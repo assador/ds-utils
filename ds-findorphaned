@@ -1,6 +1,6 @@
 #!/usr/bin/perl
 #
-#  ds-findorphaned, v1.0.2, CLI
+#  ds-findorphaned, v1.1.0, CLI
 #  Copyright © 2016-2017 Dmitry Sokolov
 #
 #  This program is free software: you can redistribute it and/or modify
@@ -26,13 +26,13 @@
 #  Зависимости: perl
 #  Рекомендуется: enca
 #
-#  ds-findorphaned [-p] [-r] [-R] [-e кодировка] [-l лог-файл]
+#  ds-findorphaned [-v] [-r] [-R] [-e кодировка] [-l лог-файл]
 #                  [-d 'каталог[, каталог…]'] [-f 'маска']
 #                  [-D 'каталог[, каталог…]'] [-F 'маска']
 #
-#  -p  — от print        — Только перечислить файлы
-#                          (по умолчанию также выводится суммирующая информация
-#                          и предлагается удаление осиротевших файлов).
+#  -v  — от verbose      — Выводить суммирующую информацию
+#                          и предлагать удаление осиротевших файлов
+#                          (по умолчанию — нет, только построчное перечисление).
 #  -e  — от encoding     — Кодировка читаемых файлов
 #                          (по умолчанию — * — автоопределение с помощью enca).
 #  -d  — от directories  — Каталоги, на упоминание файлов в которых
@@ -50,7 +50,7 @@
 #  -l  — от log          — Создаваемый лог-файл
 #                          (по умолчанию не создаётся, а пишется на stdout).
 #
-#  Пример: ds-findorphaned -prR -e "CP1251" -l "~/log.txt" \
+#  Пример: ds-findorphaned -v -r -R -e "CP1251" -l "~/log.txt" \
 #                          -d "~/maybe_orphaned_images" -f ".*\.jpg$" \
 #                          -D "~/search_here, ~/and_here" -F ".*\.php$"
 #
@@ -98,7 +98,7 @@ sub wantedInFiles {
 	}
 }
 
-getopts('prRe:d:f:D:F:l:', \%opts);
+getopts('vrRe:d:f:D:F:l:', \%opts);
 $opts{e} = '*' unless exists $opts{e};
 $opts{d} = exists $opts{d} ? [split(/\s*,\s*/, $opts{d})] : [abs_path(getcwd)];
 $opts{D} = exists $opts{D} ? [split(/\s*,\s*/, $opts{D})] : [abs_path(getcwd)];
@@ -111,7 +111,7 @@ foreach(@{$opts{d}}) {
 foreach(@{$opts{D}}) {
 	if(-d && -s) {$inner = 0; find(\&wantedInFiles, abs_path($_));}
 }
-if(!exists $opts{p}) {
+if(exists $opts{v}) {
 	$mess =
 		scalar(@isOrphaned) + scalar(@notOrphaned) .
 		" files found with mask /$opts{f}/ in director" .
@@ -136,7 +136,7 @@ if(exists $opts{l} && $log) {
 	print LOG $log;
 	close(LOG);
 }
-if(!exists $opts{p}) {
+if(exists $opts{v}) {
 	print "-" x 80 . "\n" . $mess;
 	if(@isOrphaned) {
 		print
