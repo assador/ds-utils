@@ -1,6 +1,6 @@
 #!/usr/bin/perl
 #
-#  ds-findbytags, v1.1.5, CLI / GTK+ 2
+#  ds-findbytags, v1.1.6, CLI / GTK+ 2
 #  Copyright © 2016-2017 Dmitry Sokolov
 #
 #  This program is free software: you can redistribute it and/or modify
@@ -207,12 +207,18 @@ sub gtk {
 	sub gtk_begin {
 		$opts_v{k} = 1 if $begin_keepcb->get_active;
 		$opts_v{s} = $begin_savefc->get_filename if $begin_savecb->get_active;
-		$opts_v{a} = $search_a->get_text if $search_a->get_text =~ m/\S/;
-		$opts_v{o} = $search_o->get_text if $search_o->get_text =~ m/\S/;
-		$opts_v{n} = $search_n->get_text if $search_n->get_text =~ m/\S/;
-		$opts_v{i} = $action_i->get_text if $action_i->get_text =~ m/\S/;
-		$opts_v{d} = $action_d->get_text if $action_d->get_text =~ m/\S/;
-		$opts_v{c} = $action_c->get_text if $action_c->get_text =~ m/\S/;
+		if($search_a->get_text =~ m/\S/) {$opts_v{a} = $search_a->get_text}
+			else {delete $opts_v{a}}
+		if($search_o->get_text =~ m/\S/) {$opts_v{o} = $search_o->get_text}
+			else {delete $opts_v{o}}
+		if($search_n->get_text =~ m/\S/) {$opts_v{n} = $search_n->get_text}
+			else {delete $opts_v{n}}
+		if($action_i->get_text =~ m/\S/) {$opts_v{i} = $action_i->get_text}
+			else {delete $opts_v{i}}
+		if($action_d->get_text =~ m/\S/) {$opts_v{d} = $action_d->get_text}
+			else {delete $opts_v{d}}
+		if($action_c->get_text =~ m/\S/) {$opts_v{c} = $action_c->get_text}
+			else {delete $opts_v{c}}
 		@dirs = (); foreach(@findin_b) {push @dirs, $_->get_label;}
 		&begin() if @dirs > 0;
 	}
