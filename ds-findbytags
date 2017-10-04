@@ -428,7 +428,8 @@ sub gtk {
 	$window->add($hpaned);
 
 	$vbox = Gtk2::VBox->new(FALSE, 5);
-	$vbox->set_size_request(370, -1);
+	$vbox->set_size_request(385, -1);
+	$hpaned->pack1($vbox, TRUE, FALSE);
 
 	my $treeview = &build_tree(&tree($opts_v{t}, "keyword_tree"));
 	if($treeview) {
@@ -437,14 +438,11 @@ sub gtk {
 			{"target" => "text/plain", "flags" => [], "info" => 0}
 		);
 		$treeview->signal_connect(button_press_event => \&treeview_clicked);
-		$hpaned->pack1($vbox, TRUE, FALSE);
 		$scrolledwindow = Gtk2::ScrolledWindow->new;
 		$scrolledwindow->set_size_request(130, -1);
 		$scrolledwindow->set_policy("automatic", "automatic");
 		$scrolledwindow->add($treeview);
 		$hpaned->pack2($scrolledwindow, TRUE, FALSE);
-	} else {
-		$hpaned->pack1($vbox, TRUE, FALSE);
 	}
 
 	$findin_frame = Gtk2::Frame->new(" Искать в ");
