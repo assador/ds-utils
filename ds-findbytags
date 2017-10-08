@@ -16,7 +16,7 @@
 #  You should have received a copy of the GNU General Public License
 #  along with this program.  If not, see <http://www.gnu.org/licenses/>.
 #
-#  C / GTK+ 2 program, that searches in the specified directories the images
+#  Perl script, that searches in the specified directories the images
 #  with keywords (tags) specified in XMP or IPTC metadata and satisfy
 #  the specified AND, OR, NOT conditions. Optionally the found images will open
 #  in the specified program. Along the way, you can massively add, remove
