@@ -1,6 +1,6 @@
 #!/usr/bin/perl
 #
-#  ds-findbytags, v1.1.6, CLI / GTK+ 2
+#  ds-findbytags, v1.1.7, CLI / GTK+ 2
 #  Copyright © 2016-2017 Dmitry Sokolov
 #
 #  This program is free software: you can redistribute it and/or modify
@@ -16,54 +16,56 @@
 #  You should have received a copy of the GNU General Public License
 #  along with this program.  If not, see <http://www.gnu.org/licenses/>.
 #
-#  Скрипт ищет в указанных каталогах изображения с ключевыми словами (тэгами),
-#  заданными в метаданных XMP или IPTC и удовлетворяющими заданным логическим
-#  условиям И, ИЛИ, НЕ. Опционально найденные изображения откроются в указанной
-#  программе. Попутно в найденных изображениях можно массово добавить, удалить
-#  или заменить тэги, сохранить ссылки на эти изображения в указанный каталог
-#  с оригинальными или случайными именами.
-#  Подробнее: http://sokolov.website/programs/ds-utils/ds-findbytags
-#
-#  Зависимости: perl, exiv2
-#  Рекомендуется: gtk2
-#
-#  ds-findbytags [-g] [-k] [-t путь_к_файлу_тэгов] [-e кодировка]
-#                [-a "тэг, тэг, ..."] [-o "тэг, тэг, ..."] [-n "тэг, тэг, ..."]
-#                [-i "тэг, тэг, ..."] [-d "тэг, тэг, ..."]
-#                [-c "тэг, тэг, [тэг, тэг], ..."] [-l просмотрщик]
-#                [-s путь_к_сохраняемым_ссылкам] путь(-и)_где_искать
-#
-#  -g  — от GUI       — При наличии ключа скрипт запускается в GTK-интерфейсе
-#                       вместо CLI-интерфейса.
-#  -k  — от keep      — При наличии ключа ссылки именуются по именам найденных
-#                       файлов, при отсутствии ключа ссылки именуются случайным
-#                       набором символов.
-#  -t  — от tags      — Путь к XML-файлу с деревом тэгов в формате Geeqie
-#                       (по умолчанию — $HOME/.config/geeqie/geeqierc.xml).
-#                       Всё, не относящееся в этом файле к тэгам, игнорируется.
-#                       Если неверен, дерево тэгов не показывается.
-#                       Тэги из дерева добавляются перетаскиванием в нужное поле
-#                       или, при двойным клике правой кнопкой мыши, в поле «И».
-#  -e  — от encoding  — Кодировка XML-файла тэгов в формате Geeqie
-#                       (по умолчанию — * — автоопределение с помощью enca).
-#  -a  — от and       — При соответствии каждому из списка тэгов.
-#  -o  — от or        — При соответствии любому из списка тэгов.
-#  -n  — от not       — За исключением любого из списка тэгов.
-#  -i  — от insert    — Добавить тэги в найденные файлы.
-#  -d  — от delete    — Удалить тэги из найденных файлов.
-#  -c  — от change    — Заменить тэги в найденных файлах.
-#  -l  — от look      — Программа, в которой открывается каталог с найденными
-#                       изображениями; по умолчанию — Geeqie. Если не нужно
-#                       открывать его вообще, значение ключа должно быть no.
-#  -s  — от save      — Каталог (абсолютный путь), в котором сохраняются ссылки
-#                       на найденное после окончания работы скрипта. Если ключ
-#                       не указан, создаётся временный каталог по месту запуска
-#                       скрипта, который после окончания его работы удаляется.
-#
-#  Пример: ds-findbytags -g -k -t "~/.config/geeqie/geeqierc.xml"
-#                        -a "море, серые тучки, камни" -o "чайки, дельфины" \
-#                        -n "акулы, люди" -i "ах" -d "море" -c "чайки, птички" \
-#                        -l "no" -s "~/chosen" ~/photos1 ~/photos2
+#  C / GTK+ 2 program, that searches in the specified directories the images
+#  with keywords (tags) specified in XMP or IPTC metadata and satisfy
+#  the specified AND, OR, NOT conditions. Optionally the found images will open
+#  in the specified program. Along the way, you can massively add, remove
+#  or replace tags in the found images and to save symlinks to these images
+#  in the specified directory with original or random names.
+#  Read more: http://sokolov.website/programs/ds-utils/ds-findbytags
+#  
+#  Depends: perl, exiv2
+#  Recommends: gtk2
+#  
+#  ds-findbytags [-g] [-k] [-t path_to_tags_file] [-e encoding]
+#                [-a "tag, tag, ..."] [-o "tag, tag, ..."] [-n "tag, tag, ..."]
+#                [-i "tag, tag, ..."] [-d "tag, tag, ..."]
+#                [-c "tag, tag, [tag, tag], ..."] [-l viewer]
+#                [-s path_the_symlinks_are_saved] path(s)_where_to_search
+#  
+#  -g  — (GUI)       — If the key is present, the program runs
+#                      in the GTK interface instead of the CLI interface.
+#  -k  — (keep)      — If the key is present, the symlinks are named by
+#                      the names of the files found. In the absence of the key,
+#                      the symlinks are named by a random character set.
+#  -t  — (tags)      — Path to the XML file with the tags tree in the Geeqie
+#                      format (by default — $HOME/.config/geeqie/geeqierc.xml).
+#                      Everything in this file, that is not belong to tags,
+#                      is ignored. If the path is incorrect, the tags tree is
+#                      not displayed. Tags from the tree are added by draggging
+#                      to the required field, or — to the field “AND” —
+#                      by double-click of the right mouse button.
+#  -e  — (encoding)  — Encoding of the Geeqie-formatted XML file with tags
+#                      (by default — * — autodetect with enca).
+#  -a  — (and)       — File must contain all the tags specified in this key.
+#  -o  — (or)        — File must contain at least one of the specified tags.
+#  -n  — (not)       — File must not contain any of the specified tags.
+#  -i  — (insert)    — Add the tags specified in this key to the found files.
+#  -d  — (delete)    — Delete the specified tags from the found files.
+#  -c  — (change)    — Replace the specified tags in the found files, in pairs.
+#  -l  — (look)      — The program in which the directory with the found files
+#                      is opened; the default is Geeqie. If you do not need
+#                      to open it at all, the key value must be “no”.
+#  -s  — (save)      — The directory (absolute path), in which the symlinks to
+#                      the found files are saved after the end of the program.
+#                      If the key is not specified, a temporary directory
+#                      is created at the location of the program start,
+#                      which after the end of the program is deleted.
+#  
+#  Example: ds-findbytags -g -k -t "~/.config/geeqie/geeqierc.xml" \
+#                         -a "sea, gloomy clouds, stones" -o "birds, dolphins" \
+#                         -n "sharks, bees" -i "wow" -d "sea" -c "birds, cats" \
+#                         -l "no" -s "~/chosen" ~/photos1 ~/photos2
 #
 #  Dmitry Sokolov <dmitry@sokolov.website>
 
@@ -82,13 +84,16 @@ my $exts = 'gif|jpe?g|pdf|png|tiff?';
 my @worden = ('0' .. '9', 'A' .. 'Z', 'a' .. 'z');
 
 sub wanted {
+	my $fi = Encode::decode("utf8", $_);
+	my $fd = Encode::decode("utf8", $File::Find::dir);
+	my $fn = Encode::decode("utf8", $File::Find::name);
 	if(-f && -s && /\.$exts$/i) {
-		my @tags = `exiv2 -PXnt '$File::Find::name'`
+		my @tags = `exiv2 -PXnt '$fn'`
 			=~ /^subject\s*(?=\S)(.+)$/gm;
 		if(@tags != 0) {
 			@tags = split /\s*,\s*/, $tags[0];
 		} else {
-			@tags = `exiv2 -PInt '$File::Find::name'`
+			@tags = `exiv2 -PInt '$fn'`
 				=~ /^Keywords\s*(?=\S)(.+)$/gm;
 		}
 		if(
@@ -99,42 +104,42 @@ sub wanted {
 			(exists $opts_v{n} ? @{(&jis(\@tags, $opts_v{n}))[1]} == 0 : 1)
 		) {
 			if(exists $opts_v{d} || exists $opts_v{c} || exists $opts_v{i}) {
-				my %ntags = map {$_ => 1} @tags;
+				my %ntags = map {$fi => 1} @tags;
 				if(exists $opts_v{d}) {
 					foreach(@{$opts_v{d}}) {
-						if($ntags{$_}) {
-							delete $ntags{$_};
+						if($ntags{$fi}) {
+							delete $ntags{$fi};
 						}
 					}
 				}
 				if(exists $opts_v{c}) {
 					foreach(@{$opts_v{c}}) {
-						if($ntags{@{$_}[0]}) {
-							delete $ntags{@{$_}[0]};
-							$ntags{@{$_}[1]} = 1;
+						if($ntags{@{$fi}[0]}) {
+							delete $ntags{@{$fi}[0]};
+							$ntags{@{$fi}[1]} = 1;
 						}
 					}
 				}
 				if(exists $opts_v{i}) {
 					foreach(@{$opts_v{i}}) {
-						$ntags{$_} = 1;
+						$ntags{$fi} = 1;
 					}
 				}
 				my @ntags = keys %ntags;
 				my $do =
 					"exiv2 -M\"add Xmp.dc.subject\" " .
 					"-M\"del Iptc.Application2.Keywords\" " .
-					"\'$File::Find::name\'";
+					"\'$fn\'";
 				`$do`;
 				foreach(@ntags) {
 					my $do =
-						"exiv2 -M\"set Xmp.dc.subject XmpBag $_\" " .
-						"-M\"add Iptc.Application2.Keywords String $_\" " .
-						"\'$File::Find::name\'";
+						"exiv2 -M\"set Xmp.dc.subject XmpBag $fi\" " .
+						"-M\"add Iptc.Application2.Keywords String $fi\" " .
+						"\'$fn\'";
 					`$do`;
 				}
 			}
-			push @files, {path => $File::Find::dir, file => $_};
+			push @files, {path => $fd, file => $fi};
 		}
 	}
 }
@@ -416,7 +421,7 @@ sub gtk {
 	$window = Gtk2::Window->new;
 	$window->signal_connect(destroy => sub {Gtk2->main_quit;});
 	$window->set_title(
-		"FindByTags — " .
+		"ds-findbytags — " .
 		"Поиск картинок по тэгам и операции с тэгами найденных картинок"
 	);
 	$window->set_default_size(700, 100);
