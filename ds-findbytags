@@ -16,7 +16,7 @@
 #  You should have received a copy of the GNU General Public License
 #  along with this program.  If not, see <http://www.gnu.org/licenses/>.
 #
-#  Perl script, that searches in the specified directories the images
+#  Perl / GTK+ 2 script, that searches in the specified directories the images
 #  with keywords (tags) specified in XMP or IPTC metadata and satisfy
 #  the specified AND, OR, NOT conditions. Optionally the found images will open
 #  in the specified program. Along the way, you can massively add, remove
@@ -89,12 +89,12 @@ sub wanted {
 	my $fn = Encode::decode("utf8", $File::Find::name);
 	if(-f && -s && /\.$exts$/i) {
 		my @tags = `exiv2 -PXnt '$fn'`
-			=~ /^subject\s*(?=\S)(.+)$/gm;
+			=~ /^subject\s+(?=\S)(.+)$/gm;
 		if(@tags != 0) {
 			@tags = split /\s*,\s*/, $tags[0];
 		} else {
 			@tags = `exiv2 -PInt '$fn'`
-				=~ /^Keywords\s*(?=\S)(.+)$/gm;
+				=~ /^Keywords\s+(?=\S)(.+)$/gm;
 		}
 		if(
 			(exists $opts_v{a}
