@@ -1,6 +1,6 @@
 #!/usr/bin/perl
 #
-#  ds-findbytags, v1.1.7, CLI / GTK+ 2
+#  ds-findbytags, v1.1.8, CLI / GTK+ 2
 #  Copyright © 2016-2017 Dmitry Sokolov
 #
 #  This program is free software: you can redistribute it and/or modify
@@ -16,57 +16,6 @@
 #  You should have received a copy of the GNU General Public License
 #  along with this program.  If not, see <http://www.gnu.org/licenses/>.
 #
-#  Perl / GTK+ 2 script, that searches in the specified directories the images
-#  with keywords (tags) specified in XMP or IPTC metadata and satisfy
-#  the specified AND, OR, NOT conditions. Optionally the found images will open
-#  in the specified program. Along the way, you can massively add, remove
-#  or replace tags in the found images and to save symlinks to these images
-#  in the specified directory with original or random names.
-#  Read more: http://sokolov.website/programs/ds-utils/ds-findbytags
-#  
-#  Depends: perl, exiv2
-#  Recommends: gtk2
-#  
-#  ds-findbytags [-g] [-k] [-t path_to_tags_file] [-e encoding]
-#                [-a "tag, tag, ..."] [-o "tag, tag, ..."] [-n "tag, tag, ..."]
-#                [-i "tag, tag, ..."] [-d "tag, tag, ..."]
-#                [-c "tag, tag, [tag, tag], ..."] [-l viewer]
-#                [-s path_the_symlinks_are_saved] path(s)_where_to_search
-#  
-#  -g  — (GUI)       — If the key is present, the program runs
-#                      in the GTK interface instead of the CLI interface.
-#  -k  — (keep)      — If the key is present, the symlinks are named by
-#                      the names of the files found. In the absence of the key,
-#                      the symlinks are named by a random character set.
-#  -t  — (tags)      — Path to the XML file with the tags tree in the Geeqie
-#                      format (by default — $HOME/.config/geeqie/geeqierc.xml).
-#                      Everything in this file, that is not belong to tags,
-#                      is ignored. If the path is incorrect, the tags tree is
-#                      not displayed. Tags from the tree are added by draggging
-#                      to the required field, or — to the field “AND” —
-#                      by double-click of the right mouse button.
-#  -e  — (encoding)  — Encoding of the Geeqie-formatted XML file with tags
-#                      (by default — * — autodetect with enca).
-#  -a  — (and)       — File must contain all the tags specified in this key.
-#  -o  — (or)        — File must contain at least one of the specified tags.
-#  -n  — (not)       — File must not contain any of the specified tags.
-#  -i  — (insert)    — Add the tags specified in this key to the found files.
-#  -d  — (delete)    — Delete the specified tags from the found files.
-#  -c  — (change)    — Replace the specified tags in the found files, in pairs.
-#  -l  — (look)      — The program in which the directory with the found files
-#                      is opened; the default is Geeqie. If you do not need
-#                      to open it at all, the key value must be “no”.
-#  -s  — (save)      — The directory (absolute path), in which the symlinks to
-#                      the found files are saved after the end of the program.
-#                      If the key is not specified, a temporary directory
-#                      is created at the location of the program start,
-#                      which after the end of the program is deleted.
-#  
-#  Example: ds-findbytags -g -k -t "~/.config/geeqie/geeqierc.xml" \
-#                         -a "sea, gloomy clouds, stones" -o "birds, dolphins" \
-#                         -n "sharks, bees" -i "wow" -d "sea" -c "birds, cats" \
-#                         -l "no" -s "~/chosen" ~/photos1 ~/photos2
-#
 #  Dmitry Sokolov <dmitry@sokolov.website>
 
 use strict;
@@ -78,6 +27,103 @@ use Cwd qw/abs_path/;
 use File::Find;
 use File::Spec::Functions;
 use Getopt::Std;
+
+use constant VERSION => "v1.1.8";
+use constant COPYRIGHT => "Copyright © 2016-2017";
+use constant AUTHOR => "Dmitry Sokolov <dmitry\@sokolov.website>";
+use constant WEBSITE =>
+	"http://sokolov.website/programs/ds-utils/ds-findbytags";
+use constant LICENSE =>
+	"This program is free software: you can redistribute it and/or modify it" .
+	"\nunder the terms of the GNU General Public License as published\n" .
+	"by the Free Software Foundation, either version 3 of the License,\n" .
+	"or (at your option) any later version.\n\n" .
+	"This program is distributed in the hope that it will be useful,\n" .
+	"but WITHOUT ANY WARRANTY; without even the implied warranty\n" .
+	"of MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.\n" .
+	"See the GNU General Public License for more details.\n\n" .
+	"You should have received a copy of the GNU General Public License\n" .
+	"along with this program. If not, see <http://www.gnu.org/licenses/>";
+use constant COMMENTS =>
+	"Perl / GTK+ 2 script, that searches in the specified directories " .
+	"the images with keywords (tags) specified in XMP or IPTC metadata " .
+	"and satisfy the specified AND, OR, NOT conditions. Optionally the found " .
+	"images will open in the specified program. Along the way, you can " .
+	"massively add, remove or replace tags in the found images and to save " .
+	"symlinks to these images in the specified directory with original " .
+	"or random names.\n\n" .
+	"Depends: perl, exiv2. Recommends: gtk2.\n\n" .
+	"For more information run the script without any keys or arguments, " .
+	"or with -h key.";
+use constant HELP =>
+	"ds-findbytags, " . VERSION . ", CLI / GTK+ 2\n" .
+	"Copyright © 2016-2017 Dmitry Sokolov\n" .
+	"\n" .
+	"This program is free software: you can redistribute it and/or modify\n" .
+	"it under the terms of the GNU General Public License as published by\n" .
+	"the Free Software Foundation, either version 3 of the License, or\n" .
+	"(at your option) any later version.\n" .
+	"\n" .
+	"This program is distributed in the hope that it will be useful,\n" .
+	"but WITHOUT ANY WARRANTY; without even the implied warranty of\n" .
+	"MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the\n" .
+	"GNU General Public License for more details.\n" .
+	"\n" .
+	"You should have received a copy of the GNU General Public License\n" .
+	"along with this program.  If not, see <http://www.gnu.org/licenses/>.\n" .
+	"\n" .
+	"Perl / GTK+ 2 script, that searches in the specified directories the images\n" .
+	"with keywords (tags) specified in XMP or IPTC metadata and satisfy\n" .
+	"the specified AND, OR, NOT conditions. Optionally the found images will open\n" .
+	"in the specified program. Along the way, you can massively add, remove\n" .
+	"or replace tags in the found images and to save symlinks to these images\n" .
+	"in the specified directory with original or random names.\n" .
+	"Read more: http://sokolov.website/programs/ds-utils/ds-findbytags\n" .
+	"\n" .
+	"Depends: perl, exiv2\n" .
+	"Recommends: gtk2\n" .
+	"\n" .
+	"ds-findbytags [-g] [-k] [-t path_to_tags_file] [-e encoding]\n" .
+	"              [-a \"tag, tag, ...\"] [-o \"tag, tag, ...\"] [-n \"tag, tag, ...\"]\n" .
+	"              [-i \"tag, tag, ...\"] [-d \"tag, tag, ...\"]\n" .
+	"              [-c \"tag, tag, [tag, tag], ...\"] [-l viewer]\n" .
+	"              [-s path_the_symlinks_are_saved] path(s)_where_to_search\n" .
+	"\n" .
+	"-g  — (GUI)       — If the key is present, the program runs\n" .
+	"                    in the GTK interface instead of the CLI interface.\n" .
+	"-k  — (keep)      — If the key is present, the symlinks are named by\n" .
+	"                    the names of the files found. In the absence of the key,\n" .
+	"                    the symlinks are named by a random character set.\n" .
+	"-t  — (tags)      — Path to the XML file with the tags tree in the Geeqie\n" .
+	"                    format (by default — \$HOME/.config/geeqie/geeqierc.xml).\n" .
+	"                    Everything in this file, that is not belong to tags,\n" .
+	"                    is ignored. If the path is incorrect, the tags tree is\n" .
+	"                    not displayed. Tags from the tree are added by draggging\n" .
+	"                    to the required field, or — to the field “AND” —\n" .
+	"                    by double-click of the right mouse button.\n" .
+	"-e  — (encoding)  — Encoding of the Geeqie-formatted XML file with tags\n" .
+	"                    (by default — * — autodetect with enca).\n" .
+	"-a  — (and)       — File must contain all the tags specified in this key.\n" .
+	"-o  — (or)        — File must contain at least one of the specified tags.\n" .
+	"-n  — (not)       — File must not contain any of the specified tags.\n" .
+	"-i  — (insert)    — Add the tags specified in this key to the found files.\n" .
+	"-d  — (delete)    — Delete the specified tags from the found files.\n" .
+	"-c  — (change)    — Replace the specified tags in the found files, in pairs.\n" .
+	"-l  — (look)      — The program in which the directory with the found files\n" .
+	"                    is opened; the default is Geeqie. If you do not need\n" .
+	"                    to open it at all, the key value must be “no”.\n" .
+	"-s  — (save)      — The directory (absolute path), in which the symlinks to\n" .
+	"                    the found files are saved after the end of the program.\n" .
+	"                    If the key is not specified, a temporary directory\n" .
+	"                    is created at the location of the program start,\n" .
+	"                    which after the end of the program is deleted.\n" .
+	"\n" .
+	"Example: ds-findbytags -g -k -t \"~/.config/geeqie/geeqierc.xml\" \\\n" .
+	"                       -a \"sea, gloomy clouds, stones\" -o \"birds, dolphins\" \\\n" .
+	"                       -n \"sharks, bees\" -i \"wow\" -d \"sea\" -c \"birds, cats\" \\\n" .
+	"                       -l \"no\" -s \"~/chosen\" ~/photos1 ~/photos2\n" .
+	"\n" .
+	"Dmitry Sokolov <dmitry\@sokolov.website>\n";
 
 my (@dirs, @files, %opts, %opts_v);
 my $exts = 'gif|jpe?g|pdf|png|tiff?';
@@ -417,11 +463,28 @@ sub gtk {
 		$dialog->run;
 		$dialog->destroy;
 	}
+	sub show_about {
+		my $dialog = Gtk2::AboutDialog->new;
+		$dialog->set_version(VERSION);
+		$dialog->set_copyright(COPYRIGHT);
+		$dialog->set_authors(AUTHOR);
+		$dialog->set_website(WEBSITE);
+		$dialog->set_license(LICENSE);
+		$dialog->set_comments(COMMENTS);
+		$dialog->run;
+		$dialog->destroy;
+	}
 
 	$window = Gtk2::Window->new;
 	$window->signal_connect(destroy => sub {Gtk2->main_quit;});
+	$window->signal_connect(key_release_event => sub {
+		my ($widget, $event) = @_;
+		if($event->hardware_keycode == 67) {
+			&show_about();
+		}
+	});
 	$window->set_title(
-		"ds-findbytags — " .
+		"ds-findbytags " . VERSION . " — " .
 		"Поиск картинок по тэгам и операции с тэгами найденных картинок"
 	);
 	$window->set_default_size(700, 100);
@@ -654,17 +717,22 @@ sub gtk {
 	Gtk2->main;
 }
 
-getopts("gka:o:n:i:d:c:l:s:t:e:", \%opts);
+getopts("hgka:o:n:i:d:c:l:s:t:e:", \%opts);
 @dirs = @ARGV;
 foreach(@dirs) {$_ = abs_path $_;}
 $opts{t} = $ENV{HOME} . "/.config/geeqie/geeqierc.xml" unless exists $opts{t};
 $opts{e} = "*" unless exists $opts{e};
 $opts{l} = "geeqie" unless exists $opts{l} and $opts{l} ne "no";
 %opts_v = %opts;
+die "\n" . HELP . "\n" if exists $opts_v{h};
 if(exists $opts_v{g}) {
 	&gtk();
 } else {
-	die "Не выбраны пути для поиска\n" if @dirs == 0;
+	die
+		"\nAt least one path or -g key must be specified (see below).\n\n" .
+		HELP .
+		"\n"
+		if @dirs == 0;
 	&begin();
 }
 exit 0;
