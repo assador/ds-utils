@@ -1,6 +1,6 @@
 #!/usr/bin/perl
 #
-#  ds-measurer, v1.6.0, GTK+
+#  ds-measurer, v1.6.1, GTK+
 #  Copyright © 2016-2017 Dmitry Sokolov
 #
 #  This file is part of ds-measurer.
@@ -99,6 +99,7 @@ my %c = &cscc();
 ($c{dsx}, $c{dsy}) = (0, 0);
 my %w = &cscc();
 $w{sline} = 0;
+$w{type} = "m";
 $w{marks} = $config->{"selection guides"};
 $w{colors} = [&set_colors("default")];
 
@@ -128,9 +129,11 @@ sub reduce_fraction {
 	my ($n, $d) = @_;
 	supplement_primes($n > $d ? $n : $d);
 	foreach my $p (@primes) {
-		while(!($n % $p) && !($d % $p)) {
-			$n = $n / $p;
-			$d = $d / $p;
+		if($n > 1 && $d > 1) {
+			while(!($n % $p) && !($d % $p)) {
+				$n = $n / $p;
+				$d = $d / $p;
+			}
 		}
 		last if $p > $n && $p > $d;
 	}
