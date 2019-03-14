@@ -1,0 +1,17 @@
+#!/usr/bin/perl
+
+use strict;
+use warnings;
+use utf8;
+use open qw/:encoding(UTF-8) :std/;
+use POSIX;
+
+my $type = @ARGV ? shift : "html";
+my $source = "";
+my $temp = "/tmp/jsb";
+while(<STDIN>) {$source .= $_;}
+open(OUT, ">", $temp) or die "Can't create $temp: $!\n";
+print OUT $source;
+close(OUT);
+print `js-beautify --type $type -t -n -m 0 -E '' -U '' $temp`;
+exit 0;

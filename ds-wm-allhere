@@ -1,0 +1,43 @@
+#!/usr/bin/perl
+
+#  perl скрипт [-r <RATIO>]
+#
+#  -r  — от ratio  — соотношение сторон <RATIO> окна: X : Y
+#                    * значение по умолчанию — 1 , 1
+
+use strict;
+use warnings;
+use utf8;
+use open qw/:encoding(UTF-8) :std/;
+use POSIX;
+use Getopt::Std;
+
+my ($screen, $window, %opts, $c, $h, @p);
+
+getopts('r:', \%opts);
+my @w = `wmctrl -l` =~ /^\s*(\S+)\s+\d.*$/gm;
+my @R = `wmctrl -d` =~ /^\s*\d+\s*\*.*WA\:.*?(\d+)\s*x\s*(\d+).*?$/m;
+my @r = exists $opts{r} ? (split(/\s*[^\d\s]\s*/, $opts{r})) : ("1", "1");
+if($R[0] / $r[0] > $R[1] / $r[1]) {
+	$c = floor(($R[0] / $R[1]) / ($r[0] / $r[1]));
+	$h = 1;
+} else {
+	$c = floor(($r[0] / $r[1]) / ($R[0] / $R[1]));
+	$h = 0;
+}
+my @fs = (ceil(sqrt(scalar(@w) / $c)));
+if($h) {
+	push(@fs, ceil(scalar(@w) / $fs[0]));
+} else {
+	unshift(@fs, ceil(scalar(@w) / $fs[0]));
+}
+$p[2] = 1 / $fs[0];
+$p[3] = 1 / $fs[1];
+for(my $i = 0; $i < scalar(@w); $i++) {
+	$p[0] = $p[2] * ($i % $fs[0]);
+	$p[1] = $p[3] * floor($i / $fs[0]);
+	`wmctrl -i -r $w[$i] -b remove,maximized_horz -b remove,maximized_vert && wmctrl -i -r $w[$i] -t 0 && wmctrl -i -a $w[$i] && ds-wm -c "$p[0],$p[1]" -s "$p[2]x$p[3]"`;
+}
+`wmctrl -i -a $w[0]`;
+
+exit 0;

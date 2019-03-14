@@ -1,0 +1,3 @@
+#!/bin/bash
+ND=`nextdirnum -s 3 $1` && mkdir $ND && cd $ND && gphoto2 --get-all-files && rename 's/(.*)/\L$1\E/' * && exiv2 -r '%Y_%m_%d_%H_%M_%S' rename * && geeqie $ND
+exit 0

@@ -1,0 +1,49 @@
+#!/usr/bin/perl
+
+use strict;
+use warnings;
+use utf8;
+use open qw/:encoding(UTF-8) :std/;
+use POSIX;
+
+my $source = "";
+
+my @sample = (
+	'\$this\s*\->\s*title\s*\=\s*\'\s*.*?\';',
+	'\$this\s*\->\s*temp_description\s*\=\s*\'\s*.*?\';',
+	'\$this\s*\->\s*temp_keywords\s*\=\s*\'\s*.*?\';',
+	'\$this\s*\->\s*temp_seo_text\s*\=\s*\'\s*.*?\';',
+);
+my @replace = (
+	'\$this->title = \'Принтио\';',
+	'\$this->temp_description = \'Принтио\';',
+	'\$this->temp_keywords = \'Принтио\';',
+	'\$this->temp_seo_text = \'<div class=\"seo-text-content\"></div>\';',
+);
+
+sub setent {
+	my $text = shift;
+	my $ret = $text;
+	my $pos;
+	for(my $c = 0; $c < scalar @sample; $c++) {
+		$text = $ret;
+		$ret = "";
+		$pos = 0;
+		my $s = $sample[$c];
+		my $r = $replace[$c];
+		$s =~ s/\\(\d+)/'\\'.($1+1)/ge;
+		$r =~ s/\$(\d+)/'".$'.($1+1).'."'/ge;
+		$r = '"'.$r.'"';
+		while($text =~ m/(.*?)$s/gsmix) {
+			$pos = pos($text);
+			$ret .= $1 . (eval $r);
+		}
+		$ret .= substr($text, $pos);
+	}
+	return $ret;
+}
+
+while(<STDIN>) {$source .= $_;}
+$source = &setent($source);
+print $source;
+exit 0;

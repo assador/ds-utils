@@ -1,0 +1,108 @@
+#!/usr/bin/perl
+
+#  perl namesphones.pl [-f [-c …]] | [[-l | -s …] [-b …]] [-d …] [-u …] [-p …]
+#
+#  -f  — от fill      — наполнить базу данных случайными значениями
+#  -c  — от count     — количество генерируемых записей; по умолчанию — 3000000
+#  -l  — от list      — вывести -b записей на страницу
+#  -b  — от by        — количество записей на страницу вывода; по умолчанию — 50
+#  -s  — от search    — условие поиска записей; например, 'phone > 89000000000'
+#                       ищет все номера телефонов, начинающиеся с 89
+#                       работает также с перелистыванием
+#  -d  — от database  — строка параметров базы данных, разделёнными двоеточиями:
+#                       драйвер:имя_базы:хост:порт
+#                       по умолчанию — mysql:db_test:localhost:3306
+#  -u  — от user      — имя пользователя базы; по умолчанию — dbu_test
+#  -p  — от password  — пароль пользователя базы; по умолчанию — G)^t3rT>vc
+
+use strict;
+use warnings;
+use utf8;
+use open qw/:encoding(UTF-8) :std/;
+use POSIX;
+use DBI;
+use Getopt::Std;
+
+my (%opts, $dbh, $sth, $rc, $ref, $rand);
+my @chars = ('a'..'z', 'A'..'Z');
+my @numbs = ('0'..'9');
+
+my %data = (
+	name => [],
+	phone => []
+);
+sub connect_to_database {
+	$dbh = DBI->connect(
+		'dbi:' . $opts{d}, $opts{u}, $opts{p}, {RaiseError => 1, AutoCommit => 0}
+	) or die $DBI::errstr;
+}
+sub disconnect_from_database {
+	$rc = $sth->finish if exists $opts{l} or $opts{s} ne '';
+	$rc = $dbh->disconnect;
+}
+sub generate_data {
+	for(my $i = 1; $i < $opts{c} + 1; $i++) {
+		$rand = ''; $rand .= $chars[rand @chars] for 0..11; push @{$data{name}}, $rand;
+		$rand = ''; $rand .= $numbs[rand @numbs] for 0..10; push @{$data{phone}}, int $rand;
+	}
+}
+sub fill_database {
+	$sth = $dbh->prepare("
+		CREATE TABLE IF NOT EXISTS `namesphones` (
+			`id` INT NOT NULL AUTO_INCREMENT,
+			`name` VARCHAR(12) NULL,
+			`phone` BIGINT(11) ZEROFILL NULL,
+			`created` TIMESTAMP(6) NOT NULL,
+			PRIMARY KEY (`id`),
+			INDEX `ix_phone` (`phone` ASC))
+		ENGINE = InnoDB
+		DEFAULT CHARACTER SET = utf8;
+	");
+	$sth->execute();
+	$sth = $dbh->prepare("INSERT INTO `namesphones` (`name`, `phone`) VALUES (?, ?)");
+	$sth->execute_array({}, $data{name}, $data{phone}) or die $sth->errstr;
+	$dbh->commit;
+}
+sub show_rows {
+	my ($offset, $count, $where) = @_;
+	$where = " WHERE $where" if $where ne '';
+	$sth = $dbh->prepare("
+		SELECT * FROM `namesphones` JOIN (
+			SELECT `id` FROM `namesphones`$where ORDER BY `id` LIMIT $offset, $count
+		) AS `b` ON `b`.`id` = `namesphones`.`id`
+	");
+	$sth->execute() or die $sth->errstr;
+	my $shown = 0;
+	while($ref = $sth->fetchrow_hashref) {
+		print " " x (7 - length $$ref{'id'}) .
+			$$ref{'id'} . "  " .
+			$$ref{'name'} . "  " .
+			sprintf("%011d", $$ref{'phone'}) . "  " .
+			$$ref{'created'} . "\n";
+		$shown++;
+	}
+	return $shown < $count ? 0 : 1;
+}
+
+getopts('fls:d:u:p:c:b:', \%opts);
+$opts{d} = "mysql:db_test:localhost:3306" unless exists $opts{d};
+$opts{u} = "dbu_test" unless exists $opts{u};
+$opts{p} = "G)^t3rT>vc" unless exists $opts{p};
+$opts{c} = 3000000 unless exists $opts{c};
+$opts{b} = 50 unless exists $opts{b};
+$opts{s} = '' unless exists $opts{s};
+&generate_data() if exists $opts{f};
+&connect_to_database();
+&fill_database() if exists $opts{f};
+if(exists $opts{l} or $opts{s} ne '') {
+	my ($nextoffset, $continue) = (0, 1);
+	do {
+		$continue = &show_rows($nextoffset, $opts{b}, $opts{s});
+		$nextoffset += $opts{b};
+		print "---  Вывод по $opts{b} записей" .
+			($continue ? ". Нажмите Enter для продолжения." : " закончен.\n");
+	} while($continue and <STDIN>);
+}
+&disconnect_from_database();
+
+exit 0;

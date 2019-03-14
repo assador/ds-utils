@@ -1,0 +1,12 @@
+#!/bin/bash
+
+if [[ $2 ]]; then
+	o="$(amixer -c 0 sset $1 $2)"
+elif [[ $1 ]]; then
+	o="$(amixer -c 0 sset Master $1)"
+else
+	o="$(amixer -c 0 sget Master)"
+fi
+#echo "$o" | perl -0pe 's/^.*\bleft\b[^\r\n[]*\[\s*(\d+)[^\r\n]*\n[^\r\n]*\bright\b[^\r\n[]*\[\s*(\d+).*$/\1-\2 %\n/si' | xargs -0 notify-send -t 1
+
+exit 0

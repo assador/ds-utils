@@ -1,0 +1,65 @@
+#!/usr/bin/perl
+
+#	perl скрипт [-r] [-b] [-e 'кодировка,кодировка'] [-o 'оператор_регулярного_выражения'] [-m 'маска_имени_файла'] [-p 'файла_списка_файлов'] [анализируемый_каталог [анализируемый_каталог …]]
+#	-r	— от recursive		— анализировать рекурсивно (по умолчанию — нет)
+#	-b	— от backup			— создавать бэкапы файлов (по умолчанию — нет)
+#	-e	— от encoding		— кодировки читаемых / сохраняемых файлов (по умолчанию — *,UTF-8 — автоопределение с помощью enca
+#	-o	— от operator		— оператор регулярных выражений, s/// и пр. (по умолчанию — ничего)
+#	-m	— от mask			— регулярное выражение имени файла, без пути (по умолчанию — соответствует любому имени)
+#	-p	— от paths			— файл с путями к конкретным файлам (а не каталогам) для анализа — по пути на строку
+#	анализируемый_каталог	— по умолчанию — .
+#	Пример: perl "E:\sites\perl\processfiles.pl" -r -b -e "cp1251,cp1251" -o "s/(<xsl:stylesheet[^<>]*>)(?!\s*<xsl:output)/$1<xsl:output\ omit-xml-declaration=\"yes\"\/>/gsm" -m ".*\.xsl$" -p "E:\sites\additional_files.txt" "E:\sites\sitename"
+
+use strict;
+use warnings;
+use utf8;
+use open qw/:encoding(UTF-8) :std/;
+use POSIX;
+use File::Find;
+use File::Copy;
+use Getopt::Std;
+
+my (@dirs, @paths, @opte, %opts, $mask);
+my ($inner, $checked, $processed) = (0, 0, 0);
+
+sub process {
+	my $file = shift;
+	my $content = undef;
+	if($opts{e}->[0] eq '*') {$opte[0] = `enca -r '$file'` || "UTF-8"; chomp $opte[0];}
+	open(IN, "<:encoding($opte[0])", $file) or print "Can’t open $file: $!\n" and return;
+	while(local $_ = <IN>) {$content .= $_;}
+	close(IN);
+	if(eval '$content =~ ' . $opts{o}) {
+		copy($file, $file . "~") or print "Can’t make backup of $file: $!\n" if exists $opts{b};
+		open(OUT, ">:encoding($opte[1])", $file) or print "Can’t open to write in $opte[0] $file: $!\n" and return;
+		print OUT $content;
+		close(OUT);
+		$processed++;
+	}
+	$checked++;
+}
+sub wanted {
+	if(!$inner) {$inner = 1; return;}
+	$File::Find::prune = 1 if !$File::Find::prune && !(exists $opts{r});
+	if(-f && -s && $_ =~ $mask) {&process($File::Find::name);}
+}
+
+getopts('rbe:o:m:p:', \%opts);
+@dirs = @ARGV ? @ARGV : (exists $opts{p} ? () : ('.'));
+if(exists $opts{p}) {
+	if(open(IN, "<", $opts{p})) {
+		while(local $_ = <IN>) {chomp $_; push @paths, $_;}
+		close(IN);
+	} else {print "Can’t open $opts{p}: $!\n" . (scalar @dirs > 0 ? "Will analyze the paths in arguments\n" : "");}
+}
+$opts{e} = '*,UTF-8' unless exists $opts{e};
+$opts{e} = [split(/\s*,\s*/, $opts{e})];
+@opte = @{$opts{e}};
+$mask = exists $opts{m} ? qr/$opts{m}/ : qr/.+/;
+die "Regex operator needed (option -o)\n" unless exists $opts{o};
+foreach(@paths, @dirs) {
+	my $fullname = File::Spec->rel2abs($_);
+	if(-f && -s && $_ =~ $mask) {&process($fullname);} else {$inner = 0; find(\&wanted, $fullname);}
+}
+print "$checked files was checked and $processed of its was processed\n";
+exit 0;

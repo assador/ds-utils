@@ -1,0 +1,49 @@
+#!/usr/bin/perl
+
+#	perl скрипт [-o оператор_регулярного_выражения] [-m маска_имени_файла] [анализируемая_папка [анализируемая_папка] ...]
+#	-r	— от recursive	— анализировать рекурсивно (по умолчанию — нет)
+#	-o	— от operator	— оператор регулярных выражений, s/// и пр. (по умолчанию — ничего)
+#	-m	— от mask		— регулярное выражение имени файла, без пути (по умолчанию — соответствует любому имени)
+#	анализируемая_папка	— по умолчанию — /
+#	Пример: perl "E:\sites\perl\psf.pl" -r -o "s/sample/replace/gsm" -m ".*\.css$" "/user/css"
+
+use strict;
+use warnings;
+use utf8;
+use open qw/:encoding(UTF-8) :std/;
+use POSIX;
+use File::Spec;
+use Getopt::Std;
+use Encode;
+
+my (@dirs, %opts);
+my @sites = (
+	{opts => '-b -w -e "cp1251|cp1251"', path => 'E:\sites\PrimeHouse'},
+	{opts => '-b -w -e "cp1251|cp1251"', path => 'E:\sites\ph_ceilings'},
+	{opts => '-b -w -e "cp1251|cp1251"', path => 'E:\sites\sun-naves'},
+	{opts => '-b -w -e "cp1251|cp1251"', path => 'E:\sites\otrjad'},
+	{opts => '-b -w -e "utf8|utf8"', path => 'E:\sites\clipso'},
+	{opts => '-b -w -e "utf8|utf8"', path => 'E:\sites\mapn'},
+);
+
+getopts('ro:m:', \%opts);
+foreach my $opt (%opts) {$opt = decode("cp1251", $opt);}
+@dirs = @ARGV ? @ARGV : ('/');
+$opts{m} = '.+' unless exists $opts{m};
+die "Regex operator needed (option -o)\n" unless exists $opts{o};
+foreach my $site (@sites) {
+	foreach my $dir (@dirs) {
+		push @{$site->{dirs}}, File::Spec->catdir(File::Spec->canonpath($site->{path}), File::Spec->canonpath($dir));
+	}
+	push @{$site->{args}}, 'perl';
+	push @{$site->{args}}, 'E:\sites\perl\processfiles.pl';
+	push @{$site->{args}}, '-r' if exists $opts{r};
+	push @{$site->{args}}, $site->{opts};
+	push @{$site->{args}}, "-o \"$opts{o}\"";
+	push @{$site->{args}}, "-m \"$opts{m}\"";
+	foreach my $dir (@{$site->{dirs}}) {push @{$site->{args}}, $dir;}
+	my $command = join(" ", @{$site->{args}});
+	$command = encode("cp1251", $command);
+	print `$command`;
+}
+exit 0;

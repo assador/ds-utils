@@ -1,0 +1,15 @@
+#!/bin/bash
+
+id=`xdotool getactivewindow | xargs printf '0x%x'`
+name=`xwininfo -id $id | perl -0pe "s/.*$id\s*\"([^\"]+).*/\1/s"`
+let bh=`xprop -id $id | perl -0pe 's/^.*\b_NET_FRAME_EXTENTS\b\D*(\d+)\D+(\d+)\D+(\d+)\D+(\d+).*$/\1+\2/ms'`
+let bv=`xprop -id $id | perl -0pe 's/^.*\b_NET_FRAME_EXTENTS\b\D*(\d+)\D+(\d+)\D+(\d+)\D+(\d+).*$/\3+\4/ms'`
+echo "$id=$name" > /tmp/ds-wm-csize
+while true; do
+	let w=`xwininfo -id $id | perl -0pe 's/.*^\s*Width\:\s*(\d+).*/\1/ms'`+$bh
+	let h=`xwininfo -id $id | perl -0pe 's/.*^\s*Height\:\s*(\d+).*/\1/ms'`+$bv
+	wmctrl -i -r $id -N "$w × $h — $name"
+	sleep 0.2
+done
+
+exit 0

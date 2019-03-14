@@ -71,12 +71,17 @@ use Getopt::Std;
 use Encode;
 
 my (%opts, @notOrphaned, @isOrphaned, $opte, $inner, $mess, $decision, $log);
+my ($countFor, $countIn) = (0, 0);
 
 sub wantedForFiles {
 	if(!$inner) {$inner = 1; return;}
 	$File::Find::prune = 1 if !$File::Find::prune && !(exists $opts{r});
-	push @isOrphaned, {name => $_, path => $File::Find::name}
-		if(-f && $_ =~ m/$opts{f}/);
+	if(-f && $_ =~ m/$opts{f}/) {
+		push @isOrphaned, {name => $_, path => $File::Find::name};
+		$countFor++;
+		print "\r";
+		print "Collecting files to check for their mention: " . $countFor . ".";
+	}
 }
 sub wantedInFiles {
 	if(!$inner) {$inner = 1; return;}
@@ -89,6 +94,11 @@ sub wantedInFiles {
 			or die "Can’t open $File::Find::name: $!\n";
 		while($_ = <IN>) {$source .= $_;}
 		close(IN);
+		$countIn++;
+		print "\r";
+		print
+			"Checking the file number $countIn. " .
+			"There is " . @isOrphaned . " maybe orphaned files at this time.";
 		for(my $i = 0; $i < @isOrphaned; $i++) {
 			if($source =~ m/\b\Q$isOrphaned[$i]->{name}\E\b/gms) {
 				push(@notOrphaned, splice(@isOrphaned, $i, 1));
@@ -108,9 +118,11 @@ $opts{F} = '.*' unless exists $opts{F};
 foreach(@{$opts{d}}) {
 	if(-d && -s) {$inner = 0; find(\&wantedForFiles, abs_path($_));}
 }
+print "\n";
 foreach(@{$opts{D}}) {
 	if(-d && -s) {$inner = 0; find(\&wantedInFiles, abs_path($_));}
 }
+print "\n";
 if(exists $opts{v}) {
 	$mess =
 		scalar(@isOrphaned) + scalar(@notOrphaned) .

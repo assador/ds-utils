@@ -1,0 +1,11 @@
+#!/bin/bash
+
+for i in "$@"; do
+	if [ $(pidof $i) > '0' ]; then
+		kill $(pidof $i)
+	else
+		$i
+	fi
+done
+
+exit 0

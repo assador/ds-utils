@@ -1,0 +1,13 @@
+#!/bin/bash
+
+if [[ $1 ]]; then
+	cp "/mnt/sshfs/printdays_easy02$1" "/mnt/sshfs/printdays_easy03$1"
+	cp "/mnt/sshfs/printdays_easy02$1" "/mnt/sshfs/printdays_colorise$1"
+	cp "/mnt/sshfs/printdays_easy02$1" "/mnt/sshfs/printdays_expo112$1"
+	cp "/mnt/sshfs/printdays_easy02$1" "/mnt/sshfs/printdays_jagganath$1"
+	cp "/mnt/sshfs/printdays_easy02$1" "/mnt/sshfs/printdays_pikart$1"
+	cp "/mnt/sshfs/printdays_easy02$1" "/mnt/sshfs/printdays_printio$1"
+	cp "/mnt/sshfs/printdays_easy02$1" "/mnt/sshfs/printdays_printoline$1"
+fi
+
+exit 0

@@ -1,0 +1,31 @@
+#!/usr/bin/perl
+
+#	Скрипт сверяет с помощью meld файлы, находящиеся в том числе в сети.
+#	perl скрипт файл файл
+
+use strict;
+use warnings;
+use utf8;
+use open qw/:encoding(UTF-8) :std/;
+use POSIX;
+use File::Basename;
+
+my (@args, @files, @dirs);
+
+sub getfile {
+	my $address = shift;
+	$address =~ s/.*?(?=\w+\:\/\/)//;
+	my $dir = dirname($address); my $file = basename($address);
+	$dir =~ s/.*\w+\:\/\///; $dir =~ s/[^@]*@//; $dir =~ s/\//_/ig; $dir = "/tmp/" . $dir;
+	system("mkdir", $dir); push @dirs, $dir;
+	system("wget", "--directory-prefix=$dir", $address);
+	push @files, $dir . "/" . $file;
+}
+
+@args = @ARGV if @ARGV == 2 || @ARGV == 3 or die "Неверное количество аргументов.\n";
+foreach (@args) {
+	if($_ =~ m/\w+\:\/\//i) {&getfile($_);} else {push @files, "'" . $_ . "'";}
+}
+system("{(meld -n @files && rm -rf @dirs) &}");
+
+exit 0;

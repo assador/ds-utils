@@ -1,0 +1,18 @@
+#!/bin/bash
+
+# Удаление очередей
+/sbin/tc qdisc del dev eth2 ingress
+/sbin/tc qdisc del dev eth2 root handle 1:
+
+if [[ $1 && $1 != 'reset' ]]; then
+	# Ограничение скорости отдачи
+	/sbin/tc qdisc add dev eth2 root handle 1: htb default 10 r2q 1
+	/sbin/tc class add dev eth2 parent 1: classid 1:10 htb rate ${1}kbit quantum 8000 burst 8k
+fi
+if [[ $2 && $2 != 'reset' ]]; then
+	# Ограничение скорости загрузки
+	/sbin/tc qdisc add dev eth2 handle ffff: ingress
+	/sbin/tc filter add dev eth2 parent ffff: protocol ip prio 50 u32 match ip src 0.0.0.0/0 police rate ${2}kbit burst 12k drop flowid :1
+fi
+
+exit 0

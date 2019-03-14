@@ -1,0 +1,55 @@
+#!/usr/bin/perl
+
+#  perl скрипт [-x] [-c <COORD>] [-s <SIZE>] [-o <OPTIONS>] [<ID>]
+#
+#  -x  — от… просто так  — считать за координаты окна его центр
+#  -c  — от coordinates  — координаты <COORD> окна: X, Y
+#                          * значение по умолчанию — текущие координаты окна
+#  -s  — от size         — размеры <SIZE> окна (пробелы в кавычках не важны): ширина x высота
+#                          * значение по умолчанию — текущие размеры окна
+#  -o  — от options      — дополнительные опции wmctrl (-r в man wmctrl)
+#                          * значение по умолчанию пустое
+#  <ID>                  — ID окна назначения в HEX (0x…)
+#                          * значение по умолчанию — активное окно
+#
+#      * если в значениях координат или размеров присутствует точка,
+#        то значение воспринимается как дробь, в противном случае — как пиксели
+#      * если значение координат или размеров отрицательное, оно воспринимается
+#        как положительное от противоположной стороны экрана (в случае координат)
+#        или от точки координат (в случае размеров) в обратную сторону
+
+use strict;
+use warnings;
+use utf8;
+use open qw/:encoding(UTF-8) :std/;
+use POSIX;
+use Getopt::Std;
+use Math::Round;
+
+my ($screen, $window, @cn, @sn, %opts);
+
+getopts("xc:s:o:", \%opts);
+$opts{o} = "" unless exists $opts{o};
+$window = @ARGV ? "-i -r " . join(" ", @ARGV) : "-r :ACTIVE:";
+my @D = `wmctrl -d` =~ /^\s*\d+\s*\*.*WA\:.*?(\d+)\s*x\s*(\d+).*?$/m;
+my %W = (id => @ARGV ? $ARGV[0] : `xdotool getactivewindow | xargs printf '0x%x'`);
+$W{lrtb} = [`xprop -id "$W{id}"` =~ /^.*\b_NET_FRAME_EXTENTS\b\D*(\d+)\D+(\d+)\D+(\d+)\D+(\d+).*$/m];
+`xwininfo -id "$W{id}"` =~ /^\s*Absolute\ upper-left\ X\:\s*(\d+).*?^\s*Absolute\ upper-left\ Y\:\s*(\d+).*?^\s*Width\:\s*(\d+).*?^\s*Height\:\s*(\d+)/ms;
+$W{xy} = [$1 - $W{lrtb}[0], $2 - $W{lrtb}[2]]; $W{wh} = [$3 + $W{lrtb}[0] + $W{lrtb}[1], $4 + $W{lrtb}[2] + $W{lrtb}[3]];
+my @c = exists $opts{c} ? (split(/\s*[^-.\d\s]\s*/, $opts{c})) : ($W{xy}[0], $W{xy}[1]);
+my @s = exists $opts{s} ? (split(/\s*[^-.\d\s]\s*/, $opts{s})) : ($W{wh}[0], $W{wh}[1]);
+for(my $i = 0; $i < scalar @s; $i++) {
+	if($s[$i] =~ /\./) {$s[$i] = round($D[$i] * $s[$i]);} else {$s[$i] = 1 * $s[$i];}
+	$sn[$i] = abs $s[$i];
+}
+for(my $i = 0; $i < scalar @c; $i++) {
+	if($c[$i] =~ /\./) {$c[$i] = round($D[$i] * $c[$i]);} else {$c[$i] = 1 * $c[$i];}
+	if($c[$i] < 0) {$cn[$i] = $D[$i] + $c[$i];} else {$cn[$i] = $c[$i];}
+	if($s[$i] < 0) {$cn[$i] = $cn[$i] - $sn[$i];}
+}
+if(exists $opts{x}) {$cn[0] -= round($sn[0] / 2); $cn[1] -= round($sn[1] / 2);}
+$sn[0] -= $W{lrtb}[0] + $W{lrtb}[1]; $sn[1] -= $W{lrtb}[2] + $W{lrtb}[3];
+`wmctrl -e "0,$cn[0],$cn[1],$sn[0],$sn[1]" $opts{o} $window`;
+`wmctrl -e "0,$cn[0],$cn[1],$sn[0],$sn[1]" $opts{o} $window` if `xdotool getwindowname $W{id}` =~ /^\s*(terminal|терминал)\b/i; # Костыль для терминалов
+
+exit 0;

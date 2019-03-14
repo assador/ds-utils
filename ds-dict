@@ -1,0 +1,5 @@
+#!/bin/bash
+
+xclip -o | xargs -0 dict | ds-textfield
+
+exit 0

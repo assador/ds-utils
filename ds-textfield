@@ -1,0 +1,60 @@
+#!/usr/bin/perl
+
+#	Простое текстовое поле. Появляется на месте курсора мыши, висит поверх всех окон, убирается по клавише “Esc”. Может принимать текст из файлов, указанных аргументами, или через конвейер.
+
+use strict;
+use warnings;
+use utf8;
+use open qw/:encoding(UTF-8) :std/;
+use POSIX;
+use Gtk2 "-init";
+
+my $saveto = '/home/assador/notes/Разное.txt';
+
+my $window = Gtk2::Window->new;
+$window->signal_connect(destroy => sub {Gtk2->main_quit;});
+$window->signal_connect(key_release_event => \&key_release);
+$window->set_decorated(0);
+$window->set_default_size(200, 50);
+$window->set_position("GTK_WIN_POS_MOUSE");
+$window->set_keep_above(1);
+
+my $textfield = Gtk2::TextView->new;
+$textfield->set_wrap_mode("GTK_WRAP_WORD");
+$textfield->set_right_margin(2);
+$textfield->set_left_margin(4);
+if(@ARGV or !-t STDIN) {
+	my $source = "";
+	while(<>) {$source .= $_;}
+	$textfield->get_buffer->set_text($source);
+}
+$window->add($textfield);
+
+$window->show_all;
+Gtk2->main;
+
+sub key_release {
+	my ($widget, $event) = @_;
+	if($event->hardware_keycode == 9) {
+		exit 0;
+	}
+	elsif($event->hardware_keycode == 39 && $event->state & "control-mask") {
+		my $output =
+			"_" x 80 . "\n" .
+			strftime("**%d.%m.%Y, %H:%M:%S**", localtime) .
+			"\n\n" .
+			$textfield->get_buffer->get_text(
+				$textfield->get_buffer->get_start_iter(),
+				$textfield->get_buffer->get_end_iter(),
+				0
+			) .
+			"\n";
+		open(NOTES, ">>:encoding(UTF-8)", $saveto)
+			or `notify-send "Can’t write in file $saveto: $!`;
+		print NOTES $output;
+		close(NOTES);
+		`notify-send "Appened to file $saveto"`;
+	}
+}
+
+exit 0;

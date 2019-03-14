@@ -1,0 +1,42 @@
+#!/usr/bin/perl
+
+#	perl скрипт [-s ширина x высота] [-v кодек] исходный_видеофайл выходной_видеофайл
+#	-s	— от scale		— размеры в пикселях выходного видеофайла
+#	-p	— от padding	— добавлять ли пустые отступы до указанного размера
+#	-v	— от video		— видеокодек с опциями
+#	Пример:	ds-videodowner -s "480 x 320" -v "mpeg4 -b:v 800k" input.mkv output.mp4
+
+
+use strict;
+use warnings;
+use utf8;
+use open qw/:encoding(UTF-8) :std/;
+use POSIX;
+use Getopt::Std;
+use Math::Round;
+
+my (%opts, %od, %nd, %id, $cv, $info, $vf);
+
+sub makeevenint {
+	my $n = shift;
+	round($n) % 2 > 0 ? $n = ceil($n) : $n = floor($n);
+	$n % 2 > 0 ? return $n + 1 : return $n;
+}
+sub innerdims {
+	my ($W, $H, $w, $h) = @_;
+	$w / $h > $W / $H ? return ($W, &makeevenint($h * $W / $w)) : return (&makeevenint($w * $H / $h), $H);
+}
+
+getopts('ps:v:', \%opts);
+die "Incorrect source file $ARGV[0]: $!\n" unless -f $ARGV[0] && -s $ARGV[0];
+$ARGV[1] = $ARGV[1] ? $ARGV[1] : $ARGV[0] . '.mp4';
+($nd{w}, $nd{h}) = exists $opts{s} ? $opts{s} =~ /(\d+)\s*x\s*(\d+)/i : (1280, 720);
+$cv = exists $opts{v} ? $opts{v} : 'libx264 -crf 23 -preset slow';
+$info = `ffprobe -show_streams '$ARGV[0]'`;
+($od{w}) = $info =~ /width\s*=\s*(\d+)/i;
+($od{h}) = $info =~ /height\s*=\s*(\d+)/i;
+die "Incorrect dimensions of source file $ARGV[0]: $od{w} x $od{h}\n" unless $od{w} && $od{h};
+($id{w}, $id{h}) = &innerdims($nd{w}, $nd{h}, $od{w}, $od{h});
+$vf = exists $opts{p} ? sprintf("scale=%.0f:%.0f,pad=%.0f:%.0f:%.0f:%.0f", $id{w}, $id{h}, $nd{w}, $nd{h}, ($nd{w} - $id{w}) / 2, ($nd{h} - $id{h}) / 2) : sprintf("scale=%.0f:%.0f", $id{w}, $id{h});
+`ffmpeg -i '$ARGV[0]' -map 0:0 -map 0:1 -c:v $cv -vf "$vf" -c:a libmp3lame -ab 128k -ar 44100 -ac 2 -y '$ARGV[1]'`;
+exit 0;

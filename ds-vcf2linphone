@@ -1,0 +1,42 @@
+#!/usr/bin/perl
+
+#	perl скрипт [-s 'sip_хост'] [-o выходной_файл] vcf_файл
+#	-s	— от scale		— размеры в пикселях выходного видеофайла
+#	-b	— от bitrate	— битрейт выходного видеофайла в килобайтах
+
+use strict;
+use warnings;
+use utf8;
+use open qw/:encoding(UTF-8) :std/;
+use POSIX;
+use Getopt::Std;
+
+my (%opts, @cards, $s, $o, $x);
+my $source = "";
+my $output = "";
+
+getopts('s:o:', \%opts);
+die "Incorrect source file\n" unless @ARGV && -f $ARGV[0] && -s $ARGV[0];
+$s = exists $opts{s} ? $opts{s} : "sip.zadarma.com";
+$o = exists $opts{o} ? $opts{o} : "linphone_contacts.txt";
+open(IN, "<", $ARGV[0]) or die "Can’t open $ARGV[0]: $!\n";
+while($_ = <IN>) {$source .= $_;}
+close(IN);
+while($source =~ m/BEGIN\:VCARD(.*?)END\:VCARD/gsmi) {
+	my $vcard = $1;
+	while($vcard =~ m/(?<!\w)FN(?!\w)[^\r\n]*\:([^:\r\n]*)/gs) {push @cards, {"name" => $1, "tels" => []};}
+	while($vcard =~ m/(?<!\w)TEL(?!\w)[^\r\n]*\:([^:\r\n]*)/gs) {push @{$cards[$#cards]{"tels"}}, $1;}
+}
+my $i = 0;
+foreach my $c (@cards) {
+	foreach my $t (@{$c->{"tels"}}) {
+		$x = $t;
+		$t = ($t =~ s/^(?:\s*sip\s*\:\s*){0,}(\S*@\S*)\s*$/sip:$1/i ? $t : "sip:$t\@$s");
+		$output .= "[friend_$i]\nurl=\"" . $c->{"name"} . " ($x)\" <$t>\npol=accept\nsubscribe=1\n";
+		$i++;
+	}
+}
+open(OUT, ">:utf8", $o) or die "Can’t create $o: $!\n";
+print OUT $output;
+close(OUT);
+exit 0;

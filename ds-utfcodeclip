@@ -1,0 +1,5 @@
+#!/bin/bash
+
+xclip -o | ds-utfcode | ds-textfield
+
+exit 0
