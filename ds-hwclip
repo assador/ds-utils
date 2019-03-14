@@ -1,0 +1,5 @@
+#!/bin/bash
+
+xclip -o | ds-hw "$1"
+
+exit 0

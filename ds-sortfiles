@@ -1,0 +1,86 @@
+#!/usr/bin/perl
+
+#	perl скрипт [-r] [-R] [-f] [-s] [анализируемая_папка [анализируемая_папка] ...]
+#	-r	— от recursive	— анализировать рекурсивно (по умолчанию — нет)
+#	-R	— от reverse	— сортировка по убыванию (по умолчанию — по возрастанию)
+#	-f	— от field		— параметр сортировки (по умолчанию — fullname)
+#	-s	— от save		— путь к файлу отчёта (по умолчанию — вывод в консоль)
+#	анализируемая_папка	— по умолчанию — .
+
+use strict;
+use warnings;
+use utf8;
+use open qw/:encoding(UTF-8) :std/;
+use POSIX;
+use File::Find;
+use File::stat;
+use Getopt::Std;
+
+my (@dirs, %opts, @files, $inner);
+my @fields = ("fullname", "dev", "ino", "mode", "nlink", "uid", "gid", "rdev", "size", "atime", "mtime", "ctime", "blksize", "blocks");
+
+sub wanted {
+	if(!$inner) {$inner = 1; return;}
+	$File::Find::prune = 1 if !$File::Find::prune && !(exists $opts{r});
+	if(-f && -s) {
+		push @files, {
+			$fields[0] => $File::Find::name,
+			$fields[1] => stat($_)->dev,
+			$fields[2] => stat($_)->ino,
+			$fields[3] => stat($_)->mode,
+			$fields[4] => stat($_)->nlink,
+			$fields[5] => stat($_)->uid,
+			$fields[6] => stat($_)->gid,
+			$fields[7] => stat($_)->rdev,
+			$fields[8] => stat($_)->size,
+			$fields[9] => &ftime(stat($_)->atime),
+			$fields[10] => &ftime(stat($_)->mtime),
+			$fields[11] => &ftime(stat($_)->ctime),
+			$fields[12] => stat($_)->blksize,
+			$fields[13] => stat($_)->blocks,
+		};
+	}
+}
+sub ftime {
+	my @ltime = localtime shift;
+	return sprintf "%02d:%02d:%02d, %s, %02d %s %04d", $ltime[2], $ltime[1], $ltime[0], ("Вс", "Пн", "Вт", "Ср", "Чт", "Пт", "Сб")[$ltime[6]], $ltime[3], ("Янв", "Фев", "Мар", "Апр", "Май", "Июн", "Июл", "Авг", "Сен", "Окт", "Ноя", "Дек")[$ltime[4]], $ltime[5] + 1900;
+}
+sub whtml {
+	my ($htmlfile, $content) = (shift, "");
+	open(OUT, ">:encoding(utf8)", $htmlfile) or die "Не могу создать файл $htmlfile: $!\n";
+	my $header = (exists $opts{r} ? 'Рекурсивный' : 'Нерекурсивный') . ' список ' . scalar @files . ' файлов в ' . (join ', ', @dirs) . ', отсортированных по ' . (exists $opts{R} ? 'убыванию' : 'возрастанию') . ' признака ' . $opts{f};
+	$content .= '<!DOCTYPE html><html><head><meta charset="utf-8" /><title>' . $header . '</title><style type="text/css">body {font-family: monospace;} td {white-space: nowrap;}</style></head><body><h1>' . $header . '</h1><table><thead><tr><th>' . $opts{f} . '</th>';
+	foreach my $field (@fields) {
+		$content .= '<th>' . $field . '</th>' if $field ne $opts{f};
+	}
+	$content .= '</tr></thead><tbody>';
+	foreach my $i (0 .. $#files) {
+		$content .= '<tr' . ($i % 2 ? '' : ' style="background-color: #e0e0e0;"') . '><td>' . $files[$i]->{$opts{f}} . '</td>';
+		foreach my $field (@fields) {
+			$content .= '<td>' . $files[$i]->{$field} . '</td>' if $field ne $opts{f};
+		}
+		$content .= '</tr>';
+	}
+	$content .= '</tbody></table></body></html>';
+	print OUT $content;
+	close OUT;
+}
+
+getopts('rRf:s:', \%opts);
+@dirs = @ARGV ? @ARGV : ('.');
+foreach my $dir (@dirs) {$inner = 0; find(\&wanted, $dir);}
+$opts{f} = exists $opts{f} && (grep /$opts{f}/, @fields) ? $opts{f} : $fields[0];
+@files = sort {eval($a->{$opts{f}} <=> $b->{$opts{f}}) || eval($a->{$opts{f}} cmp $b->{$opts{f}})} @files;
+@files = reverse @files if exists $opts{R};
+if(exists $opts{s}) {
+	&whtml($opts{s});
+} else {
+	foreach my $i (0 .. $#files) {
+		printf "%9s: ", $opts{f}; print "$files[$i]->{$opts{f}}\n";
+		foreach my $field (@fields) {
+			if($field ne $opts{f}) {printf "%9s: ", $field; print "$files[$i]->{$field}\n";}
+		}
+		print "\n";
+	}
+}
+exit 0;

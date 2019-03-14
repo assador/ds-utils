@@ -1,0 +1,10 @@
+#!/bin/bash
+
+if [ $(pidof ds-limittime) > '0' ]; then
+	echo ''
+else
+#	sudo /home/assador/scripts/ds-limittime &
+	/home/assador/scripts/ds-limittime &
+fi
+
+exit 0

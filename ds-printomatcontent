@@ -1,0 +1,86 @@
+#!/usr/bin/perl
+
+#  Скрипт берёт файл шаблона замены контента и заменяет значения по указанному(-ым) пути(-ям).
+#  В шаблоне значения меток и контента должны быть разделены табуляциями.
+#  Пробельные символы (кроме табуляций) перед значениями и после них НЕ отбрасываются.
+#
+#  perl скрипт
+#              [-f]
+#              [-b]
+#              [-e 'кодировка,кодировка']
+#              [-m 'маска_имени_файла']
+#              [-p 'файла_списка_файлов']
+#              -t файл_шаблона
+#              [анализируемый_каталог [анализируемый_каталог …]]
+#
+#  -f  — от flat          — анализировать не рекурсивно (по умолчанию — рекурсивно)
+#  -b  — от backup        — создавать бэкапы файлов (по умолчанию — нет)
+#  -e  — от encoding      — кодировки читаемых / сохраняемых файлов
+#                           (по умолчанию — *,UTF-8 — автоопределение с помощью enca
+#  -m  — от mask          — регулярное выражение имени файла, без пути (по умолчанию — \.(?:phtml|tpl|txt)$)
+#  -p  — от paths         — файл с путями к конкретным файлам (а не каталогам) для анализа — по пути на строку
+#  -t  — от template      — файл шаблона замены контента
+#  анализируемый_каталог  — по умолчанию — .
+
+use strict;
+use warnings;
+use utf8;
+use open qw/:encoding(UTF-8) :std/;
+use POSIX;
+use File::Spec;
+use File::Copy;
+use File::Find;
+use Getopt::Std;
+
+my (@conts, @dirs, @paths, @opte, %opts, $mask);
+my ($inner, $checked, $processed, $was) = (0, 0, 0, 0);
+
+sub process {
+	my $file = shift;
+	my $content = undef;
+	if($opts{e}->[0] eq '*') {$opte[0] = `enca -r '$file'` || "UTF-8"; chomp $opte[0];}
+	open(IN, "<:encoding($opte[0])", $file) or print "Can’t open $file: $!\n" and return;
+	while(local $_ = <IN>) {$content .= $_;}
+	close(IN);
+	$was = 0;
+	foreach my $cont (@conts) {
+		if($content =~ s/((?<!\/)\s*$cont->{mark}(?:\s*\*\/(?:\s*[\"\'])?|\s*\?>|\s*(?:\/\/)?\-\->)+).*?((?:<\?(?:php)?\s*|(?:[\"\']\s*)?\/\*\s*|(?:[\"\']\s*)?#\s*|<\!\-\-(?:\/\/)?\s*)+\s*\/\s*$cont->{mark})/($cont->{cont} eq 'null') ? "$1$2" : "$1$cont->{cont}$2"/gsme) {$was = 1;}
+	}
+	if($was == 1) {
+		copy($file, $file . "~") or print "Can’t make backup of $file: $!\n" if exists $opts{b};
+		open(OUT, ">:encoding($opte[1])", $file) or print "Can’t open to write in $opte[0] $file: $!\n" and return;
+		print OUT $content;
+		close(OUT);
+		$processed++;
+	}
+	$checked++;
+}
+sub wanted {
+	if(!$inner) {$inner = 1; return;}
+	$File::Find::prune = 1 if !$File::Find::prune && exists $opts{f};
+	if(-f && -s && $_ =~ $mask) {&process($File::Find::name);}
+}
+
+getopts('rbe:m:p:t:', \%opts);
+die "Template needed (option -t)\n" unless exists $opts{t};
+@dirs = @ARGV ? @ARGV : (exists $opts{p} ? () : ('.'));
+if(exists $opts{p}) {
+	if(open(IN, "<", $opts{p})) {
+		while(local $_ = <IN>) {chomp $_; push @paths, $_;}
+		close(IN);
+	} else {print "Can’t open $opts{p}: $!\n" . (scalar @dirs > 0 ? "Will analyze the paths in arguments\n" : "");}
+}
+$opts{e} = '*,UTF-8' unless exists $opts{e};
+$opts{e} = [split(/\s*,\s*/, $opts{e})];
+@opte = @{$opts{e}};
+$mask = exists $opts{m} ? qr/$opts{m}/ : qr/\.(?:phtml|tpl|txt)$/;
+open(IN, "<:encoding(UTF-8)", File::Spec->rel2abs($opts{t})) or die "Can’t open $opts{t}: $!\n";
+while(local $_ = <IN>) {
+	$_ =~ /^\t*([^\t\r\n]+)\t+([^\t\r\n]+)(?:\t.*)*$/;
+	$conts[++$#conts] = {mark => $1, cont => $2};
+}
+close(IN);
+foreach my $dir (@dirs) {$inner = 0; find(\&wanted, $dir);}
+foreach my $path (@paths) {&process($path);}
+print "$checked files was checked and $processed of its was processed\n";
+exit 0;

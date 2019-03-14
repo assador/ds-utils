@@ -1,0 +1,35 @@
+#!/usr/bin/perl
+
+use strict;
+use utf8;
+use open qw/:encoding(UTF-8) :std/;
+use warnings;
+use POSIX;
+use Cwd qw/abs_path/;
+use File::Find;
+use Getopt::Std;
+
+my (@untagged, %opts);
+my $exts = 'gif|jpe?g|pdf|png|tiff?';
+
+sub wanted {
+	if(-f && -s && /\.$exts$/) {
+		push @untagged, "$File::Find::name\n"
+			unless
+				`exiv2 -PI '$File::Find::name'` =~
+					/Iptc\.Application2\.Keywords/;
+	}
+}
+
+getopts('l:', \%opts);
+my @dirs = @ARGV ? @ARGV : ('.');
+foreach(@dirs) {$_ = abs_path $_;}
+find(\&wanted, @dirs);
+print @untagged;
+if(exists $opts{l}) {
+	open(LOG, ">:encoding(UTF-8)", $opts{l})
+		or print "Can’t write log in file $opts{l}: $!\n";
+	print LOG @untagged;
+	close(LOG);
+}
+exit 0;

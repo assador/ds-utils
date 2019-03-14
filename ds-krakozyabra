@@ -1,0 +1,5 @@
+#!/bin/bash
+
+notify-send "`xclip -o | iconv -t ISO-8859-1 | iconv -f CP1251`"
+
+exit 0

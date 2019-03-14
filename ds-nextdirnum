@@ -1,0 +1,34 @@
+#!/usr/bin/perl
+
+#	perl скрипт -s минимальное_количество_цифр_ в_имени ["путь_к_директории" ["путь_к_директории"]]
+
+use warnings;
+use utf8;
+use open qw/:encoding(UTF-8) :std/;
+use POSIX;
+use Getopt::Std;
+use File::Find;
+use File::Spec::Functions;
+
+our (%opts, @news, $dir, $max, $inner);
+
+sub max {
+	local ($dir, $max, $inner) = (shift, 0, 0);
+	find \&wanted, $dir;
+	return $max;
+}
+sub wanted {
+	if(!$inner) {$inner = 1; return;}
+	$File::Find::prune = 1 unless $File::Find::prune;
+	if(-d && /^\d+$/) {
+		$max = $_ if $max < $_;
+	}
+}
+
+getopts('s:', \%opts);
+my @dirs = @ARGV ? @ARGV : ('.');
+foreach my $dir (@dirs) {
+	push @news, catfile($dir, sprintf("%." . (exists $opts{s} ? $opts{s} : "") . "d", &max($dir) + 1));
+}
+print join ' ', @news;
+exit 0;

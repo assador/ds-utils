@@ -1,0 +1,10 @@
+#!/bin/bash
+if [[ $1 && $1 == '.' ]]; then
+	chown www-data:www-data '.'
+	chmod 775 '.'
+fi
+chown -R www-data:www-data './'
+find -L './' -type d -exec chmod 775 {} \;
+find -L './' -type f -exec chmod 664 {} \;
+find -L './' -name '.htaccess' -exec chmod 440 {} \;
+exit 0

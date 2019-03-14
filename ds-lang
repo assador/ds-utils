@@ -1,0 +1,117 @@
+#!/usr/bin/perl
+
+#	perl скрипт -p "путь_к_сайту" [-s "необрабатываемая_папка|необрабатываемая_папка|итд"] [-u] [-w]
+#	путь_к_сайту должен быть абсолютным, от корня файловой системы, а необрабатываемые_папки могут быть частями путей, например, engine/include. В этом случае все папки, в пути к которым содержится этот кусок, обрабатываться не будут. Когда скрипт идёт по дереву, он оперирует путями без слэша в самом конце. Поэтому если указывается, например, как необрабатываемая_папка user/engine/ — то скрипт будет просматривать папку engine, но не станет залезать в подпапки этого engine. Модуль определяет пути не с \ , а с / , даже в винде. Но это не страшно, поскольку винда необратные слэши понимает.
+#	Если есть ключ -w, то файлы переписываются в UTF-8. Если ключа нет, то файлы не переписываются вообще.
+#	Если есть ключ -u, то сообщения в таблицу заносятся в UTF-8, а "windows-1251" в файлах меняется на "utf-8".
+
+use warnings;
+use utf8;
+use open qw/:encoding(UTF-8) :std/;
+use POSIX;
+use Switch;
+use Getopt::Std;
+use File::Find;
+use Encode;
+use Encode::Guess qw/cp1251/;
+use DBI;
+
+my $allowedExts = 'asp|aspx|htm|html|js|txt|xml|xsl';
+my $skipStrings = '<!--.*?-->|/\*.*?\*/|(?<!:)//.*?$';
+my $reAllowed = '&nbsp;|&\\#160;|&ndash;|&mdash;|[а-яА-ЯёЁ0-9!#\$%&\*\+,-\./:;=\?@\^_`\{\|\}~\s –—“”«»]';
+my $reAllowedLimB = "(?:(?:[а-яА-ЯёЁ])(?:$reAllowed){1,}\\s*(?:&quot;|&lt;|&gt;|&\\#60;|&\\#62;|[\\\\\"\'<>\(\)\[\]])\\s*(?=(?:$reAllowed){1,}(?=[а-яА-ЯёЁ])))";
+my $reCyr = "(?=[а-яА-ЯёЁ])(?:$reAllowedLimB|(?:$reAllowed){1,}){1,}";
+my @skippedStrings = ();
+my @subst = ('hJpQe8ZyX3', 'es0uZUDcvD', 'vnkB1Ao8HD', 'SPIufTR806', 'oC1f45lrdI');
+
+sub wanted {
+	foreach my $skipDir (@{$opts{s}}) {
+		return $File::Find::prune = 1 if $File::Find::dir =~ m/$skipDir/;
+	}
+	&checkFile if -f && -s;
+}
+sub checkFile {
+	$file = $_;
+	return 0 unless $file =~ m/\.(?:$allowedExts)$/i;
+	$fullName = $File::Find::name;
+	$path = ($fullName =~ m/.*$opts{p}(.*)$file$/ ? $1 : 0);
+	if		($file =~ m/\.aspx?$/i	) {$fType = 1;}
+	elsif	($file =~ m/\.xsl$/i	) {$fType = 2;}
+	elsif	($file =~ m/\.html?$/i	) {$fType = 3;}
+	elsif	($file =~ m/\.js$/i		) {$fType = 4;}
+	elsif	($file =~ m/\.txt$/i	) {$fType = 5;}
+	elsif	($file =~ m/\.xml$/i	) {$fType = 6;}
+	else	{$fType = 0;}
+	$interface = $fullName =~ m/([\:\/\\])user\b/ ? 1 : $fullName =~ m/([\:\/\\])mng\b/ ? 2 : 3;
+	&processFile;
+}
+sub processFile {
+	$content = undef;
+	open(IN, "<", $fullName);
+		while(<IN>) {$content .= $_;}
+	close(IN);
+	eval {$content = decode("Guess", $content);};
+	return 0 if $content =~ m/<!--\s*no\s*translate\s*-->/si;
+	$langScript = $content =~ m/@\s*language\s*=\s*\"\s*(.*?)\s*\"/si ? $1 : "";
+	$sql = "EXEC usp_engine_addFile \@path='$path', \@file='$file', \@interface=$interface, \@langScript='$langScript', \@fType=$fType";
+	$sth = $dbh->prepare($sql) or die "$DBI::errstr\n";
+	$sth->execute or die "$DBI::errstr\n";
+	&processContent;
+}
+sub processContent {
+	$content = &excludeSkipping($content);
+	$reCyr =~ s/\\(\d+)/'\\'.($1+1)/ge;
+	while($content =~ m/($reCyr)/gx) {
+		$dbMess = $1;
+		$dbMess =~ s/\s+/ /gsx; $dbMess =~ s/\s+$//gsx;
+		$dbMess =~ s/\'/''/gsx;
+		$messPos = pos $content;
+		$sql = "EXEC usp_engine_addMess \@mess='$dbMess', \@nstr=$messPos";
+		$sql = Encode::encode("cp1251", $sql) unless exists $opts{u};
+		$sth = $dbh->prepare($sql) or die "$DBI::errstr\n";
+		$sth->execute or die "$DBI::errstr\n";
+	}
+#	$content =~ s/($reCyr)/[[[$1]]]/gx;
+	$content =~ s/windows-1251/utf-8/gi if exists $opts{w} && exists $opts{u};
+	$content = &includeSkipping($content);
+	if(exists $opts{w}) {
+		open(OUT, ">:encoding(utf8)", $fullName);
+			print OUT $content;
+		close(OUT);
+	}
+#	print "\t$sql\n";
+}
+sub excludeSkipping {
+	my $text = shift;
+	my $ret = "";
+	my $pos = 0;
+	$skipStrings =~ s/\\(\d+)/'\\'.($1+2)/ge;
+	while($text =~ m/(.*?)($skipStrings)/gsmix) {
+		$pos = pos $text;
+		push(@skippedStrings, $2);
+		$ret .= $1 . $subst[3] . scalar(scalar(@skippedStrings) - 1) . $subst[4];
+	}
+	$ret .= substr($text, $pos);
+	return $ret;
+}
+sub includeSkipping {
+	my $text = shift;
+	my $ret = "";
+	my $pos = 0;
+	while($text =~ m/(.*?)$subst[3](\d+)$subst[4]/gsmix) {
+		$pos = pos $text;
+		$ret .= $1 . $skippedStrings[$2];
+	}
+	$ret .= substr($text, $pos);
+	return $ret;
+}
+
+getopts('wup:s:', \%opts);
+$opts{s} = [split(/\|/, $opts{s})] if exists $opts{s};
+$dbh = DBI->connect('dbi:ADO:Provider=SQLOLEDB;Data Source=(local);Initial Catalog=Payweb', 'iis_pw', 'LyV78$chOpBvWFJlmo85qv') or die "$DBI::errstr\n";
+$sql = "EXEC usp_engine_ini";
+$sth = $dbh->prepare($sql) or die "$DBI::errstr\n";
+$sth->execute or die "$DBI::errstr\n";
+find(\&wanted, $opts{p});
+$dbh->disconnect;
+exit 0;

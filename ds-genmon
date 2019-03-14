@@ -1,0 +1,12 @@
+#!/bin/bash
+
+p=`nvidia-smi -q | perl -0pe 's/^.*Performance\ State\s*:\s*(\S+).*$/\1/s'`
+t=`nvidia-smi -q | perl -0pe 's/^.*GPU\ Current\ Temp\s*:\s*(\S+).*$/\1/s'`
+if [ $t -ge 100 ]; then
+#	export DISPLAY=:0 && notify-send -u critical "Температура видюхи выше 90 °C"
+	killall luxcoreui
+	killall luxcoreui
+fi
+echo "$p  $t °C"
+
+exit 0

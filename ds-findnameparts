@@ -1,0 +1,62 @@
+#!/usr/bin/perl
+
+#  Скрипт ищет в указанных каталогах все встречающиеся уникальные части имени
+#  файла (например, расширения — по-умолчанию). Уникальная часть имени должна
+#  захватываться скобками в регулярном выражении опции -m.
+#
+#  perl скрипт [-f] [-m маска_имени файла] [путь(-и)]
+#
+#  -f  — от flat  — Анализировать не рекурсивно (по умолчанию — рекурсивно).
+#  -p  — от path  — Печатать также имена файлов с путями (по умолчанию — нет).
+#  -m  — от mask  — Регулярное выражение имени файла, без пути
+#                   (по умолчанию — .+\.([^.]+)$).
+
+use strict;
+use utf8;
+use open qw/:encoding(UTF-8) :std/;
+use warnings;
+use POSIX;
+use File::Spec;
+use File::Find;
+use Getopt::Std;
+
+my (@parts, @dirs, %opts, $mask);
+my $inner = 0;
+
+sub wanted {
+	if(!$inner) {$inner = 1; return;}
+	$File::Find::prune = 1 if !$File::Find::prune && exists $opts{f};
+	if(-f && -s && $_ =~ $mask) {
+		for(my $i = 0; $i <= scalar @parts; $i++) {
+			if(scalar @parts == 0
+			|| ($i == $#parts && $1 ne $parts[$i]->{part})) {
+				$parts[++$#parts] = {part => $1, files => [$File::Find::name]};
+				last;
+			}
+			if(scalar @parts != 0
+			&& $1 eq $parts[$i]->{part}) {
+				$parts[$i]->{files}->[++$#{$parts[$i]->{files}}] =
+					$File::Find::name
+					unless $File::Find::name ~~ @{$parts[$i]->{files}};
+				last;
+			}
+		}
+	}
+}
+
+getopts('fpm:', \%opts);
+$mask = exists $opts{m} ? qr/$opts{m}/ : qr/.+\.([^.]+)$/;
+@dirs = @ARGV ? @ARGV : ('.');
+foreach(@dirs) {
+	$inner = 0;
+	find(\&wanted, File::Spec->rel2abs($_));
+}
+foreach my $part (@parts) {
+	print $part->{part} . "\n";
+	if(exists $opts{p}) {
+		foreach my $file (@{$part->{files}}) {
+			print " " x 4 . $file . "\n";
+		}
+	}
+}
+exit 0;

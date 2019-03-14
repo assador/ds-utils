@@ -1,0 +1,10 @@
+#!/bin/bash
+
+dir=`echo $1 | sed 's/\/$//'`; shift
+mkdir "$dir/160x160"
+for i in "$@"; do
+	f=`echo $i | sed 's/\.[^.]\+$/.png/'`
+	convert "$i" -resize "160x160>" "$dir/160x160/$f"
+done
+
+exit 0

@@ -1,0 +1,14 @@
+#!/bin/bash
+source=`cat "$1" | perl -0pe "s/^.*FILE\s+\"\s*(.+?)\s*\".*$/\1/ms"`
+walbum=`cueprint -d "%T" "$1"`
+mkdir "$walbum"
+cd "$walbum"
+cuebreakpoints "../$1" | shnsplit -o flac "../$source"
+cuetag "../$1" `ls`
+index=1
+for i in $(ls); do
+	wtrack=`cueprint -n $index -t "%p —\ %t.flac" "../$1"`
+	mv "$i" "$wtrack"
+	index=`expr $index + 1`
+done
+exit 0

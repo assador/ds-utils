@@ -1,0 +1,120 @@
+#!/usr/bin/perl
+
+#	perl скрипт -p путь [-t путь] [-L файл] [-l язык] [-e кодировка,кодировка,кодировка"] [-n]
+#	-p	— от path		— абсолютный путь к существующему сайту на русском языке (обязательный атрибут)
+#	-t	— от to			— абсолютный путь к создаваемому сайту на <-l> языке (по умолчанию — <-p>_<-l>)
+#	-L	— от log		— абсолютный путь к создаваемому файлу лога (по умолчанию — <-t>\log\log.htm)
+#	-l	— от language	— язык создаваемого сайта в любом регистре (по умолчанию — en)
+#	-e	— от encoding	— кодировки файлов сайта / файлов создаваемого сайта / исходных фраз в базе данных / переведённых фраз в базе данных (по умолчанию — utf8,utf8,utf8,UCS-2BE)
+#	-n	— от numbers	— вставлять перед каждым заменяемым сообщением его номер в таблице БД
+#	Пример: perl "D:\sites\perl\langreplace.pl" -p "D:\sites\payweb" -t "D:\sites\payweb_cn" -L "D:\Log\log.htm" -l "cn" -e "utf8,utf8,utf8,UCS-2BE" -n
+
+use strict;
+use warnings;
+use utf8;
+use open qw/:encoding(UTF-8) :std/;
+use POSIX;
+use Getopt::Std;
+use File::Spec;
+use Encode;
+use DBI;
+
+my ($sql, $sth, $dbh, %opts, @files);
+my @fields = ("fullname", "phrases", "replacing");	# Выводимые поля в отчёте и их порядок (см. ключи хэша в sub getFiles)
+
+sub getFiles {
+	$sql = "EXEC usp_engine_listFile";
+	$sth = $dbh->prepare($sql) or die "$DBI::errstr\n";
+	$sth->execute or die "$DBI::errstr\n";
+	while(my $row = $sth->fetchrow_hashref) {
+		push @files, {
+			fullname => File::Spec->catfile($opts{t}, $row->{path}, $row->{file}),
+			pathdb => $row->{path},
+			file => $row->{file},
+			phrases => 0,
+			replacing => 0,
+			replacefailed => [],
+		};
+	}
+	return @files;
+}
+sub processFiles {
+	foreach my $i (0 .. $#files) {
+		if(-f $files[$i]->{fullname} && -s $files[$i]->{fullname}) {
+			$sql = "EXEC usp_engine_mess_file \@path='$files[$i]->{pathdb}', \@file='$files[$i]->{file}', \@lang='\U$opts{l}\E'";
+			$sth = $dbh->prepare($sql) or die "$DBI::errstr\n";
+			$sth->execute or die "$DBI::errstr\n";
+			my $content = undef;
+			open(IN, "<", $files[$i]->{fullname}) or die "Can't read $files[$i]->{fullname}: $!\n";
+			while(<IN>) {$content .= $_;}
+			close(IN);
+			$content = decode($opts{e}->[0], $content) or die "Not a correct $opts{e}->[0] in $files[$i]->{fullname}: $!\n";
+			my ($counterPhrases, $counterReplacing) = (0, 0);
+			while(my $row = $sth->fetchrow_hashref) {
+				$counterPhrases++;
+				$row->{nMess} = decode($opts{e}->[2], $row->{nMess}) or warn "Not a correct $opts{e}->[2] in DB record of $files[$i]->{fullname}: $!\n";
+				$row->{mRus} = decode($opts{e}->[2], $row->{mRus}) or warn "Not a correct $opts{e}->[2] in DB record of $files[$i]->{fullname}: $!\n";
+				$row->{mLang} = decode($opts{e}->[3], $row->{mLang}) or warn "Not a correct $opts{e}->[3] in DB record of $files[$i]->{fullname}: $!\n";
+				if(defined $row->{mLang} && $row->{mLang} ne "") {
+					$counterReplacing++;
+					my $sample = $row->{mRus};
+					$sample =~ s/([\\\|\(\)\[\]\{\}\^\$\*\+\?\.])/\\$1/gs;
+					$sample =~ s/\s+/\\s\+/gs;
+					unless($content =~ s/$sample/exists $opts{n} && defined $row->{nMess} && $row->{nMess} ne "" ? "\{$row->{nMess}\} $row->{mLang}" : "$row->{mLang}"/gsme) {
+						push @{$files[$i]->{replacefailed}}, {nMess => $row->{nMess}, mRus => $row->{mRus}};
+					};
+				}
+			}
+			$files[$i]->{phrases} = $counterPhrases;
+			$files[$i]->{replacing} = $counterReplacing;
+			open(OUT, ">:encoding($opts{e}->[1])", $files[$i]->{fullname}) or die "Can't write $files[$i]->{fullname}: $!\n";
+			print OUT $content;
+			close(OUT);
+		}
+	}
+}
+sub whtml {
+	my ($logfile, $cont) = (shift, "");
+	open(OUT, ">:encoding($opts{e}->[1])", $logfile) or die "Can't make $logfile: $!\n";
+	my $header = "Отчёт по $opts{l}-локализации сайта $opts{p} в $opts{t}. Обработано файлов: " . scalar(@files) . '.';
+	$cont .= '<!DOCTYPE html><html><head><meta charset="' . $opts{e}->[1] . '" /><title>' . $header . '</title><style type="text/css">body {font-family: monospace;}</style></head><body><h1>' . $header . '</h1><table><thead><tr>';
+	@files = reverse sort {scalar(@{$a->{replacefailed}}) <=> scalar(@{$b->{replacefailed}})} @files;
+	foreach my $field (@fields) {
+		$cont .= '<th>' . $field . '</th>';
+	}
+	$cont .= '</tr></thead><tbody>';
+	foreach my $i (0 .. $#files) {
+		$cont .= '<tr' . (scalar @{$files[$i]->{replacefailed}} ? ' style="background-color: #ffc0ab;"' : ($i % 2 ? '' : ' style="background-color: #e0e0e0;"')) . '>';
+		foreach my $field (@fields) {
+			$cont .= '<td style="white-space: nowrap;">' . $files[$i]->{$field} . '</td>';
+		}
+		$cont .= '</tr>';
+		if(scalar @{$files[$i]->{replacefailed}}) {
+			foreach my $y (@{$files[$i]->{replacefailed}}) {
+				$cont .= '<tr style="background-color: #ffeae3;"><td colspan="' . scalar(@fields) . '">' . $y->{nMess} . ': ' . $y->{mRus} . '</td></tr>';
+			}
+		}
+	}
+	$cont .= '</tbody></table></body></html>';
+	print OUT $cont;
+	close OUT;
+}
+
+getopts('np:t:l:L:e:', \%opts);
+$opts{l} = 'en' unless exists $opts{l};
+$opts{p} = File::Spec->canonpath($opts{p});
+$opts{t} = exists $opts{t} ? File::Spec->canonpath($opts{t}) : "$opts{p}_\L$opts{l}\E";
+$opts{e} = 'utf8,utf8,utf8,UCS-2BE' unless exists $opts{e};
+$opts{e} = [split(/\s*,\s*/, $opts{e})];
+print "Copying ... ";
+system('xcopy /s /e /y /c /q /EXCLUDE:' . $opts{p} . '\ex.txt ' . $opts{p} . ' ' . $opts{t}) == 0 or die "Copy error: $?";
+unless(exists $opts{L}) {
+	system('if not exist ' . File::Spec->catfile($opts{t}, 'log') . ' mkdir ' . File::Spec->catfile($opts{t}, 'log')) == 0 or die "Can't make directory $opts{t}\log: $?";
+	$opts{L} = File::Spec->catfile($opts{t}, 'log', 'log.htm');
+}
+$dbh = DBI->connect('dbi:ADO:Provider=SQLOLEDB;Data Source=(local);Initial Catalog=Payweb', 'iis_pw', 'LyV78$chOpBvWFJlmo85qv') or die "$DBI::errstr\n";
+&getFiles();
+&processFiles();
+$dbh->disconnect;
+&whtml($opts{L});
+exit 0;

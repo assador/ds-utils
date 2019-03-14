@@ -1,0 +1,5 @@
+#!/bin/bash
+
+xclip -o | ds-typograph $1 | xclip -selection clipboard
+
+exit 0

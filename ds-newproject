@@ -1,0 +1,29 @@
+#!/bin/bash
+
+def_dir="/media/data/Scrofa Tridens/Other/defaults"
+def_prj="new_project"
+project_file="project.geany"
+editor_keys="-i"
+
+if [[ $2 ]]; then
+	echo -e "\n  ***  Создаётся каталог проекта…"
+	sudo cp -r "$def_dir/$def_prj" $2 &&
+	sudo mv $2/"$def_prj" $2/$1 &&
+	echo -e "  ***  Настраивается каталог проекта…"
+	user=`whoami`
+	sudo chown -R $user:$user $2/$1
+	cd $2/$1
+#	echo -e "  ***  Инициализация проекта (npm init)…\n"
+#	npm init &&
+#	echo -e "\n  ***  Установка Gulp 4.0…\n"
+#	npm install gulpjs/gulp#4.0 &&
+#	echo -e "\n  ***  Добавление в \$PATH пути к бинарнику Gulp…"
+#	export PATH=./node_modules/.bin:../node_modules/.bin:../../node_modules/.bin:$PATH &&
+	echo -e "  ***  Проект открывается в IDE…\n"
+	$VISUAL $editor_keys $project_file > /dev/null 2>&1 &
+	exit 0
+elif [[ $1 ]]; then
+	echo "Не задан путь для проекта." && exit 1
+else
+	echo "Не заданы имя и путь для проекта." && exit 1
+fi

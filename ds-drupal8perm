@@ -1,0 +1,40 @@
+#!/bin/bash
+read -n 1 -p "Ну, я начну разруливать права, а ты пока чайку попей, хорошо? (y/[a]): " AMSURE
+[ "$AMSURE" = "y" ] || exit
+echo "" 1>&2
+echo "Начинаю изменение прав…"
+echo "Выставляю права 755 для всех папок"
+find -L './' -type d -exec chmod 755 {} \;
+echo "Выставляю права 644 для всех файлов"
+find -L './' -type f -exec chmod 644 {} \;
+echo "Выставляю права 775 для sites"
+chmod 775 './sites'
+echo "Выставляю права 755 для sites/default"
+chmod 755 './sites/default'
+echo "Выставляю права 775 для sites/default/files"
+chmod 775 './sites/default/files'
+echo "Корректирую права g+w для подкаталогов sites/default/files"
+chmod g+w -R './sites/default/files'
+echo "Выставляю права 440 для sites/default/settings.php"
+chmod 440 './sites/default/settings.php'
+echo "Выставляю права 440 для sites/default/settings.local.php"
+chmod 440 './sites/default/settings.local.php'
+echo "Выставляю права 440 для sites/default/local.services.yml"
+chmod 440 './sites/default/local.services.yml'
+echo "Выставляю права 440 для sites/default/default.settings.php"
+chmod 440 './sites/default/default.settings.php'
+echo "Выставляю права 440 для .htaccess"
+find -L './' -name '.htaccess' -exec chmod 440 {} \;
+if [[ $1 && $1 == '.' ]]; then
+	echo "Устанавливаю владельца, группу и права для родительского каталога"
+	chown assador:www-data '.'
+	chmod 755 '.'
+fi
+echo "Устанавливаю владельца и группу для всех папок и файлов"
+chown -R assador:www-data './'
+echo "Устанавливаю владельца и группу для sites/default"
+chown www-data:www-data './sites/default'
+echo "Устанавливаю владельца и группу для sites/default/files"
+chown -R www-data:www-data './sites/default/files'
+echo "Изменение прав закончил! Убедись, что всё верно…"
+exit

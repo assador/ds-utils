@@ -1,0 +1,2 @@
+#!/bin/bash
+nc -l -p 3333 | while read msg; do notify-send "Сообщение:" $msg; done

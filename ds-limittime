@@ -1,0 +1,42 @@
+#!/usr/bin/perl
+
+#	Скрипт выводит сообщения через 1 час работы, потом ещё через 5 минут, 3 минуты (если не указаны собственные промежутки в секундах), потом через 2 минуты…
+#	perl скрипт [число секунд] [число секунд]...
+
+use strict;
+use warnings;
+use utf8;
+use open qw/:encoding(UTF-8) :std/;
+use POSIX;
+use FindBin qw($Bin);
+
+`notify-send -t 2000 -i /usr/share/icons/Faenza/actions/48/gtk-info.png "ds-limittime"`;
+my @int = @ARGV ? @ARGV : (3600, 300, 180, 120);
+my $sum = 0; foreach (@int) {$sum += $_;}
+my $ela = 0; my $rem = $sum;
+my @mss = (0, 0, 0, 0, 0, 0);
+my $txe = ""; my $txr = ""; my $sig = "";
+
+for(my $i = 1; $i < @int; $i++) {
+	sleep @int[$i - 1];
+	$sig .= " $Bin/ds-limittime.ogg";
+	print $sig . "\n";
+	$ela += @int[$i - 1]; $rem = $sum - $ela;
+	@mss = (floor($ela / 3600), floor(($ela % 3600) / 60), $ela % 60, floor($rem / 3600), floor(($rem % 3600) / 60), $rem % 60);
+	$txe = "Прошло:" .
+	($mss[0] > 0 ? (" " . $mss[0] . " час.") : "") . 
+	($mss[1] > 0 ? (" " . $mss[1] . " мин.") : "") . 
+	($mss[2] > 0 ? (" " . $mss[2] . " сек.") : "");
+	$txr = "Осталось:" .
+	($mss[3] > 0 ? (" " . $mss[3] . " час.") : "") . 
+	($mss[4] > 0 ? (" " . $mss[4] . " мин.") : "") . 
+	($mss[5] > 0 ? (" " . $mss[5] . " сек.") : "");
+	`notify-send -t 7000 -i /usr/share/icons/Faenza/actions/48/gtk-info.png "$txe" "$txr" ; mplayer$sig &`;
+}
+sleep @int[-1];
+`notify-send -t 7000 -i /usr/share/icons/Faenza/actions/48/gtk-info.png "Времени не осталось." "Выхожу." ; mplayer $Bin/ds-limittime.ogg &`;
+sleep 7;
+`xfce4-session-logout --logout`;
+#`ip link set eth0 down`;
+
+exit 0;

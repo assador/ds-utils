@@ -1,0 +1,6 @@
+#!/bin/bash
+
+[[ "$1" =~ xt=urn:btih:([^&/]+) ]] || exit;
+echo "d10:magnet-uri${#1}:${1}e" > "/media/data/Torrent/torrents/meta-${BASH_REMATCH[1]}.torrent"
+
+exit 0
