@@ -1,0 +1,9 @@
+#!/bin/bash
+
+for i in "$@"; do
+	path=$(realpath $i)
+	rm "$i"
+	cp "$path" "$i"
+done
+
+exit 0

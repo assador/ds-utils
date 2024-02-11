@@ -13,5 +13,5 @@ while(<STDIN>) {$source .= $_;}
 open(OUT, ">", $temp) or die "Can't create $temp: $!\n";
 print OUT $source;
 close(OUT);
-print `js-beautify --type $type -t -n -m 0 -E '' -U '' $temp`;
+print `js-beautify --type $type -s 2 -n -m 0 -E '' -U '' $temp`;
 exit 0;

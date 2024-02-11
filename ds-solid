@@ -6,62 +6,46 @@ use strict;
 use warnings;
 use utf8;
 use open qw/:encoding(UTF-8) :std/;
-use Gtk2 "-init";
+use Gtk3 "-init";
 
-my $cc;
-
-my $window = Gtk2::Window->new;
-$window->signal_connect(destroy => sub {Gtk2->main_quit;});
-$window->signal_connect(key_press_event => \&key_press);
+my @rgba = (1, 1, 1, 1);
+my $window = Gtk3::Window->new;
+$window->signal_connect(destroy => sub {Gtk3->main_quit;});
 $window->signal_connect(key_release_event => \&key_release);
 $window->set_decorated(0);
 $window->maximize;
 $window->fullscreen;
-my $da = Gtk2::DrawingArea->new;
-$da->signal_connect(expose_event => \&expose);
+$window->set_visual($window->get_screen->get_rgba_visual);
+my $da = Gtk3::DrawingArea->new;
+$da->signal_connect(draw => \&fill, \@rgba);
 $window->add($da);
-$window->set_colormap($window->get_screen->get_rgba_colormap);
 $window->show_all;
-Gtk2->main;
+Gtk3->main;
 
-sub expose {
-	&fill(1, 1, 1, 1);
-	return 0;
-}
-sub clear {
-	$cc = Gtk2::Gdk::Cairo::Context->create($da->window);
-	$cc->set_operator("clear");
-	$cc->paint;
-	$cc->set_operator("over");
-	return 0;
-}
 sub fill {
-	&clear;
-	$cc->set_source_rgba(shift, shift, shift, shift);
-	$cc->paint;
-	return 0;
-}
-sub key_n2c {
-	return Gtk2::Gdk::Keymap->get_entries_for_keyval(Gtk2::Gdk->keyval_from_name(shift))->{"keycode"};
-}
-sub key_press {
-	my (undef, $event) = @_;
-	if($event->hardware_keycode == key_n2c("Escape")) {exit 0;}
+	my ($widget, $context, $data) = @_;
+	$context->set_operator("clear");
+	$context->paint;
+	$context->set_operator("over");
+	$context->set_source_rgba($data->[0], $data->[1], $data->[2], $data->[3]);
+	$context->paint;
 	return 0;
 }
 sub key_release {
 	my (undef, $event) = @_;
-	if($event->hardware_keycode == key_n2c("d")) {$window->unfullscreen;}
-	if($event->hardware_keycode == key_n2c("f")) {$window->fullscreen;}
-	if($event->hardware_keycode == key_n2c("1")) {&fill(1, 1, 1, 1);}
-	if($event->hardware_keycode == key_n2c("2")) {&fill(0, 0, 0, 1);}
-	if($event->hardware_keycode == key_n2c("3")) {&fill(0.5, 0.5, 0.5, 1);}
-	if($event->hardware_keycode == key_n2c("4")) {&fill(1, 0, 0, 1);}
-	if($event->hardware_keycode == key_n2c("5")) {&fill(0, 1, 0, 1);}
-	if($event->hardware_keycode == key_n2c("6")) {&fill(0, 0, 1, 1);}
-	if($event->hardware_keycode == key_n2c("7")) {&fill(1, 1, 0, 1);}
-	if($event->hardware_keycode == key_n2c("8")) {&fill(1, 0, 1, 1);}
-	if($event->hardware_keycode == key_n2c("9")) {&fill(0, 1, 1, 1);}
+	my $key = Gtk3::Gdk::keyval_name($event->keyval);
+	exit if $key eq "Escape";
+	if ($key eq "d") {$window->unfullscreen;}
+	if ($key eq "f") {$window->fullscreen;}
+	if ($key eq "1") {@rgba = (1, 1, 1, 1); $da->queue_draw();}
+	if ($key eq "2") {@rgba = (0, 0, 0, 1); $da->queue_draw();}
+	if ($key eq "3") {@rgba = (0.5, 0.5, 0.5, 1); $da->queue_draw();}
+	if ($key eq "4") {@rgba = (1, 0, 0, 1); $da->queue_draw();}
+	if ($key eq "5") {@rgba = (0, 1, 0, 1); $da->queue_draw();}
+	if ($key eq "6") {@rgba = (0, 0, 1, 1); $da->queue_draw();}
+	if ($key eq "7") {@rgba = (1, 1, 0, 1); $da->queue_draw();}
+	if ($key eq "8") {@rgba = (1, 0, 1, 1); $da->queue_draw();}
+	if ($key eq "9") {@rgba = (0, 1, 1, 1); $da->queue_draw();}
 	return 0;
 }
 

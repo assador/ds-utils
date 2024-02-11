@@ -20,24 +20,23 @@ my @findintodelete = (
 	'/media/backup/media/data/Library',
 	'/media/backup/media/data/Nia ou Veas',
 	'/media/backup/media/data/Nia & Smallett',
+	'/media/backup/media/data/Nina',
 	'/media/backup/media/data/Octopus',
 	'/media/backup/media/data/Other',
 	'/media/backup/media/data/Scrofa Tridens',
 	'/media/backup/media/data/Temp/Necessary',
+	'/media/backup/Вашу Машу',
 );
 my @stuff = (
-	'/home/assador/notes',
 	'/home/assador/palettes',
 	'/home/assador/scripts',
 	'/media/data/Andrey',
 	'/media/data/Assador',
 	'/media/data/Archive',
-	'/media/data/Library/3D/Objects/flask',
 	'/media/data/Library/3D/Scenes',
 	'/media/data/Library/Images/Other',
 	'/media/data/Library/Images/Photo',
 	'/media/data/Library/Images/Photo unsorted',
-	'/media/data/Library/Literature',
 	'/media/data/Library/Music/Video/Octopus - Концерт в Р-Клубе 23 января 2006 года.avi',
 	'/media/data/Nia ou Veas',
 	'/media/data/Nia & Smallett',
@@ -46,6 +45,7 @@ my @stuff = (
 	'/media/data/Other',
 	'/media/data/Scrofa Tridens',
 	'/media/data/Temp/Necessary',
+	'/media/data/Вашу Машу',
 );
 my $list = "'" . join("' '", @stuff) . "'";
 my $start = time;
