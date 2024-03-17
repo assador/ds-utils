@@ -41,6 +41,7 @@
 
 use strict;
 use warnings;
+use locale;
 use utf8;
 use open qw/:encoding(UTF-8) :std/;
 use Gtk2 "-init";
