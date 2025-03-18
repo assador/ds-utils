@@ -1,5 +1,5 @@
 #!/bin/bash
 
-xclip -o | xclip -i -t UTF8_STRING -selection clipboard
+xclip -o | xclip -selection clipboard &
 
 exit 0

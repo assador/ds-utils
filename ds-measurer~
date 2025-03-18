@@ -41,11 +41,11 @@
 
 use strict;
 use warnings;
+use locale;
 use utf8;
 use open qw/:encoding(UTF-8) :std/;
 use Gtk2 "-init";
 use POSIX;
-use Math::Round;
 use YAML;
 use File::Basename;
 use constant PI => 4 * atan2(1, 1);
@@ -69,8 +69,8 @@ my $type = "m";
 my $go;
 my $fresh_selection = 1;
 if($config->{"common"}->{"selection mode"} eq "two pixels") {$go = 0;}
-	elsif($config->{"common"}->{"selection mode"} eq "outer") {$go = -0.5;}
-		else {$go = 0.5;}
+	elsif($config->{"common"}->{"selection mode"} eq "outer") {$go = -(1 / 2);}
+		else {$go = (1 / 2);}
 
 my $window = Gtk2::Window->new;
 $window->signal_connect(destroy => sub {Gtk2->main_quit;});
@@ -258,7 +258,7 @@ sub highlight {
 sub maskout_delta {
 	my ($S, $d) = @_;
 	$$S{frame} = 0 if !defined $$S{frame};
-	$$S{frame} = nearest(0.001, $$S{frame} + $d);
+	$$S{frame} = $$S{frame} + $d;
 	$$S{frame} = 0 if $$S{frame} < 0;
 	$$S{frame} = 1 if $$S{frame} > 1;
 }
@@ -277,11 +277,11 @@ sub calc_m {
 		# Выделение с фиксированным соотношением сторон
 		if($fr) {
 			if(abs $x1 - $x0 >= abs $y1 - $y0) {
-				$$S{x1} = $x0 + round($arm * ($x1 - $x0 >= 0 ? (abs $y1 - $y0) : (0 - abs $y1 - $y0)));
-				$$S{x0} = $x0 - round($arm * ($x1 - $x0 >= 0 ? (abs $y1 - $y0) : (0 - abs $y1 - $y0))) if $fc;
+				$$S{x1} = $x0 + ($arm * ($x1 - $x0 >= 0 ? (abs $y1 - $y0) : (0 - abs $y1 - $y0)));
+				$$S{x0} = $x0 - ($arm * ($x1 - $x0 >= 0 ? (abs $y1 - $y0) : (0 - abs $y1 - $y0))) if $fc;
 			} else {
-				$$S{y1} = $y0 + round($arm * ($y1 - $y0 >= 0 ? (abs $x1 - $x0) : (0 - abs $x1 - $x0)));
-				$$S{y0} = $y0 - round($arm * ($y1 - $y0 >= 0 ? (abs $x1 - $x0) : (0 - abs $x1 - $x0))) if $fc;
+				$$S{y1} = $y0 + ($arm * ($y1 - $y0 >= 0 ? (abs $x1 - $x0) : (0 - abs $x1 - $x0)));
+				$$S{y0} = $y0 - ($arm * ($y1 - $y0 >= 0 ? (abs $x1 - $x0) : (0 - abs $x1 - $x0))) if $fc;
 			}
 		}
 	}
@@ -342,9 +342,9 @@ sub calc_m {
 	if($creating) {
 		# Расчёт ширины, высоты, длины, угла и значений для прорисовки
 		($$S{w}, $$S{h}) = (abs $$S{x1} - $$S{x0}, abs $$S{y1} - $$S{y0});
-		($$S{l}, $$S{a}) = (($$S{w} ** 2 + $$S{h} ** 2) ** 0.5, atan2($$S{h}, $$S{w}));
+		($$S{l}, $$S{a}) = (($$S{w} ** 2 + $$S{h} ** 2) ** (1 / 2), atan2($$S{h}, $$S{w}));
 		$$S{aratio} = [reduce_fraction($$S{w}, $$S{h})];
-		$$S{lr} = round($$S{l}); $$S{ar} = nearest(0.01, $$S{a} * 180 / PI); $$S{ar} =~ s/,/\./;
+		$$S{lr} = $$S{l}; $$S{ar} = $$S{a} * 180 / PI; $$S{ar} =~ s/,/\./;
 	}
 	($$S{xr}, $$S{wr}) = $$S{x1} - $$S{x0} >= 0 ? ($$S{x0} + $go, $$S{x1} - $$S{x0} - ($go + $go)) : ($$S{x0} - $go, $$S{x1} - $$S{x0} + ($go + $go));
 	($$S{yr}, $$S{hr}) = $$S{y1} - $$S{y0} >= 0 ? ($$S{y0} + $go, $$S{y1} - $$S{y0} - ($go + $go)) : ($$S{y0} - $go, $$S{y1} - $$S{y0} + ($go + $go));
@@ -360,7 +360,7 @@ sub draw_m {
 		if($$S{active}) {
 			for(my $i = 1; $i < 5; $i++) {
 				$$S{context}->set_line_width($i * 4);
-				$$S{context}->set_source_rgba(0, 0, 0, 0.25 * $$S{frame} / $i);
+				$$S{context}->set_source_rgba(0, 0, 0, (1 / 4) * $$S{frame} / $i);
 				$$S{context}->rectangle($$S{x0}, $$S{y0}, $$S{x1} - $$S{x0}, $$S{y1} - $$S{y0});
 				$$S{context}->stroke;
 			}
@@ -461,7 +461,7 @@ sub draw_m {
 		# Текст, соотношение сторон, десятичная дробь
 		if($$S{aratio}[1]) {
 			my $tt_x = $$S{aratio}[0] / $$S{aratio}[1];
-			$tt = nearest(0.001, $tt_x);
+			$tt = $tt_x;
 			if($$S{x1} - $$S{x0} >= 0) {$tt .= " ~" if $tt != $tt_x;}
 				else {$tt = "~ " . $tt if $tt != $tt_x;}
 			$te = $$S{context}->text_extents($tt);
@@ -493,7 +493,7 @@ sub calc_g {
 				$$S{dx} = cos($a) * $window->get_screen->get_width;
 				$$S{dy} = sin($a) * $window->get_screen->get_height;
 			}
-	$$S{ar} = nearest(0.01, $$S{a} * 180 / PI); $$S{ar} =~ s/,/\./;
+	$$S{ar} = $$S{a} * 180 / PI; $$S{ar} =~ s/,/\./;
 }
 sub draw_g {
 	my $S = $_[0];
@@ -529,7 +529,7 @@ sub motion {
 		($c{dx}, $c{dy}) = ($c{x1}, $c{y1});
 		&cursor();
 		($c{dx}, $c{dy}) = ($c{x1} - $c{dx}, $c{y1} - $c{dy});
-		if($event->state & "mod1-mask" && ($creating || defined $idx{$type})) {&maskout_delta($S, $c{dy} * 0.002);}
+		if($event->state & "mod1-mask" && ($creating || defined $idx{$type})) {&maskout_delta($S, $c{dy} * (1 / 500));}
 		if($creating || defined $idx{$type} && $move) {
 			if($move) {
 				# Новые «координаты клика» курсора при передвижении вместо выделения

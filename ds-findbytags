@@ -1,6 +1,6 @@
 #!/usr/bin/perl
 #
-#  ds-findbytags, v1.1.8, CLI / GTK+ 2
+#  ds-findbytags, v1.1.8, CLI / GTK+ 3
 #  Copyright © 2016-2017 Dmitry Sokolov
 #
 #  This program is free software: you can redistribute it and/or modify
@@ -45,18 +45,18 @@ use constant LICENSE =>
 	"You should have received a copy of the GNU General Public License\n" .
 	"along with this program. If not, see <http://www.gnu.org/licenses/>";
 use constant COMMENTS =>
-	"Perl / GTK+ 2 script, that searches in the specified directories " .
+	"Perl / GTK+ 3 script, that searches in the specified directories " .
 	"the images with keywords (tags) specified in XMP or IPTC metadata " .
 	"and satisfy the specified AND, OR, NOT conditions. Optionally the found " .
 	"images will open in the specified program. Along the way, you can " .
 	"massively add, remove or replace tags in the found images and to save " .
 	"symlinks to these images in the specified directory with original " .
 	"or random names.\n\n" .
-	"Depends: perl, exiv2. Recommends: gtk2.\n\n" .
+	"Depends: perl, exiv2. Recommends: gtk3.\n\n" .
 	"For more information run the script without any keys or arguments, " .
 	"or with -h key.";
 use constant HELP =>
-	"ds-findbytags, " . VERSION . ", CLI / GTK+ 2\n" .
+	"ds-findbytags, " . VERSION . ", CLI / GTK+ 3\n" .
 	"Copyright © 2016-2017 Dmitry Sokolov\n" .
 	"\n" .
 	"This program is free software: you can redistribute it and/or modify\n" .
@@ -72,7 +72,7 @@ use constant HELP =>
 	"You should have received a copy of the GNU General Public License\n" .
 	"along with this program.  If not, see <http://www.gnu.org/licenses/>.\n" .
 	"\n" .
-	"Perl / GTK+ 2 script, that searches in the specified directories the images\n" .
+	"Perl / GTK+ 3 script, that searches in the specified directories the images\n" .
 	"with keywords (tags) specified in XMP or IPTC metadata and satisfy\n" .
 	"the specified AND, OR, NOT conditions. Optionally the found images will open\n" .
 	"in the specified program. Along the way, you can massively add, remove\n" .
@@ -81,7 +81,7 @@ use constant HELP =>
 	"Read more: http://sokolov.website/programs/ds-utils/ds-findbytags\n" .
 	"\n" .
 	"Depends: perl, exiv2\n" .
-	"Recommends: gtk2\n" .
+	"Recommends: gtk3\n" .
 	"\n" .
 	"ds-findbytags [-g] [-k] [-t path_to_tags_file] [-e encoding]\n" .
 	"              [-a \"tag, tag, ...\"] [-o \"tag, tag, ...\"] [-n \"tag, tag, ...\"]\n" .
@@ -241,7 +241,7 @@ sub begin {
 	@dirs = (); @files = (); %opts_v = %opts;
 }
 sub gtk {
-	use Gtk2 "-init";
+	use Gtk3 "-init";
 	use XML::Parser;
 	use constant TRUE => 1;
 	use constant FALSE => 0;
@@ -280,7 +280,7 @@ sub gtk {
 	}
 	sub choose_path {
 		my $p = shift;
-		my $c = Gtk2::FileChooserDialog->new(
+		my $c = Gtk3::FileChooserDialog->new(
 			"Искать в…", undef, "select-folder",
 			"gtk-cancel" => "cancel", "gtk-ok" => "ok"
 		);
@@ -295,8 +295,8 @@ sub gtk {
 			&show_message("error", "Этот путь уже добавлен. Выберите другой.");
 			return 0;
 		}
-		$findin_b[scalar @findin_b] = Gtk2::Button->new($p);
-		$findin_m[scalar @findin_m] = Gtk2::Button->new("-");
+		$findin_b[scalar @findin_b] = Gtk3::Button->new($p);
+		$findin_m[scalar @findin_m] = Gtk3::Button->new("-");
 		$findin_b[-1]->signal_connect(clicked => sub {
 			my $p_chosen = &choose_path($p);
 			if($p_chosen && !&was_path($p_chosen)) {
@@ -313,8 +313,8 @@ sub gtk {
 			$findin_m[-1], 2, 3, $#findin_m, $#findin_m + 1,
 			["shrink", "fill"], "fill", 0, 0
 		);
-		$tooltips->set_tip($findin_b[-1], "Изменить путь для поиска");
-		$tooltips->set_tip($findin_m[-1], "Удалить путь для поиска");
+#		$tooltips->set_tip($findin_b[-1], "Изменить путь для поиска");
+#		$tooltips->set_tip($findin_m[-1], "Удалить путь для поиска");
 		$findin_b[-1]->show;
 		$findin_m[-1]->show;
 	}
@@ -365,14 +365,14 @@ sub gtk {
 		if($tree) {
 			my $columns = [{ColumnName => "name"}, {ColumnName => "kw"}];
 			my @treestore_types = map {"Glib::String"} @$columns;
-			my $treestore = Gtk2::TreeStore->new(@treestore_types);
-			$treeview = Gtk2::TreeView->new($treestore);
+			my $treestore = Gtk3::TreeStore->new(@treestore_types);
+			$treeview = Gtk3::TreeView->new($treestore);
 			$treeview->set_headers_visible(FALSE);
 			my $column_count = 0;
 			foreach my $column (@$columns) {
-				my $col = Gtk2::TreeViewColumn->new_with_attributes(
+				my $col = Gtk3::TreeViewColumn->new_with_attributes(
 					$column->{ColumnName},
-					Gtk2::CellRendererText->new,
+					Gtk3::CellRendererText->new,
 					text => $column_count
 				);
 				$treeview->append_column($col);
@@ -453,7 +453,7 @@ sub gtk {
 		return 0;
 	}
 	sub show_message {
-		my $dialog = Gtk2::MessageDialog->new(
+		my $dialog = Gtk3::MessageDialog->new(
 			$window,
 			"destroy-with-parent",
 			shift,
@@ -464,7 +464,7 @@ sub gtk {
 		$dialog->destroy;
 	}
 	sub show_about {
-		my $dialog = Gtk2::AboutDialog->new;
+		my $dialog = Gtk3::AboutDialog->new;
 		$dialog->set_version(VERSION);
 		$dialog->set_copyright(COPYRIGHT);
 		$dialog->set_authors(AUTHOR);
@@ -475,8 +475,8 @@ sub gtk {
 		$dialog->destroy;
 	}
 
-	$window = Gtk2::Window->new;
-	$window->signal_connect(destroy => sub {Gtk2->main_quit;});
+	$window = Gtk3::Window->new;
+	$window->signal_connect(destroy => sub {Gtk3->main_quit;});
 	$window->signal_connect(key_release_event => sub {
 		my ($widget, $event) = @_;
 		if($event->hardware_keycode == 67) {
@@ -490,12 +490,12 @@ sub gtk {
 	$window->set_default_size(700, 100);
 	$window->set_border_width(5);
 
-	$tooltips = Gtk2::Tooltips->new;
+#	$tooltips = Gtk3::Tooltips->new;
 
-	$hpaned = Gtk2::HPaned->new;
+	$hpaned = Gtk3::HPaned->new;
 	$window->add($hpaned);
 
-	$vbox = Gtk2::VBox->new(FALSE, 5);
+	$vbox = Gtk3::VBox->new(FALSE, 5);
 	$vbox->set_size_request(385, -1);
 	$hpaned->pack1($vbox, TRUE, FALSE);
 
@@ -506,22 +506,22 @@ sub gtk {
 			{"target" => "text/plain", "flags" => [], "info" => 0}
 		);
 		$treeview->signal_connect(button_press_event => \&treeview_clicked);
-		$scrolledwindow = Gtk2::ScrolledWindow->new;
+		$scrolledwindow = Gtk3::ScrolledWindow->new;
 		$scrolledwindow->set_size_request(130, -1);
 		$scrolledwindow->set_policy("automatic", "automatic");
 		$scrolledwindow->add($treeview);
 		$hpaned->pack2($scrolledwindow, TRUE, FALSE);
 	}
 
-	$findin_frame = Gtk2::Frame->new(" Искать в ");
+	$findin_frame = Gtk3::Frame->new(" Искать в ");
 	$vbox->pack_start($findin_frame, FALSE, TRUE, 0);
 
-	$findin_table = Gtk2::Table->new(1, 3, FALSE);
+	$findin_table = Gtk3::Table->new(1, 3, FALSE);
 	$findin_table->set_border_width(5);
 	$findin_table->set_col_spacings(5);
 	$findin_frame->add($findin_table);
 
-	$findin_p = Gtk2::Button->new("+");
+	$findin_p = Gtk3::Button->new("+");
 	$findin_p->signal_connect(clicked => sub {
 		my $p_chosen = &choose_path($last_path);
 		if($p_chosen) {&add_path($p_chosen); $last_path = $p_chosen;}
@@ -529,181 +529,181 @@ sub gtk {
 	$findin_table->attach(
 		$findin_p, 0, 1, 0, 1, ["shrink", "fill"], "fill", 0, 0
 	);
-	$tooltips->set_tip($findin_p, "Добавить новый путь для поиска");
+#	$tooltips->set_tip($findin_p, "Добавить новый путь для поиска");
 
-	$search_frame = Gtk2::Frame->new(" Поиск по тэгам ");
+	$search_frame = Gtk3::Frame->new(" Поиск по тэгам ");
 	$vbox->pack_start($search_frame, FALSE, TRUE, 0);
 
-	$search_table = Gtk2::Table->new(3, 2, FALSE);
+	$search_table = Gtk3::Table->new(3, 2, FALSE);
 	$search_table->set_border_width(5);
 	$search_table->set_col_spacings(5);
 	$search_frame->add($search_table);
 
-	$search_a_l = Gtk2::Label->new("Присутствуют все тэги из:");
+	$search_a_l = Gtk3::Label->new("Присутствуют все тэги из:");
 	$search_a_l->set_alignment(1, 0.5);
 	$search_table->attach(
 		$search_a_l, 0, 1, 0, 1, ["shrink", "fill"], "fill", 0, 0
 	);
 
-	$search_a = Gtk2::Entry->new;
+	$search_a = Gtk3::Entry->new;
 	$search_table->attach_defaults($search_a, 1, 2, 0, 1);
-	$tooltips->set_tip(
-		$search_a,
-		"Поиск ведётся по файлам, в которых\nПРИСУТСТВУЮТ ВСЕ\n" .
-		"из перечисленных здесь тэгов (разделённых запятыми)"
-	);
+	# $tooltips->set_tip(
+	# 	$search_a,
+	# 	"Поиск ведётся по файлам, в которых\nПРИСУТСТВУЮТ ВСЕ\n" .
+	# 	"из перечисленных здесь тэгов (разделённых запятыми)"
+	# );
 	$search_a->set_text($opts_v{a}) if exists $opts_v{a};
 	$search_a->signal_connect(
 		drag_data_received => \&entry_drag_data_received, $treeview
 	);
 
-	$search_o_l = Gtk2::Label->new("Присутствует хотя бы один тэг из:");
+	$search_o_l = Gtk3::Label->new("Присутствует хотя бы один тэг из:");
 	$search_o_l->set_alignment(1, 0.5);
 	$search_table->attach(
 		$search_o_l, 0, 1, 1, 2, ["shrink", "fill"], "fill", 0, 0
 	);
 
-	$search_o = Gtk2::Entry->new;
+	$search_o = Gtk3::Entry->new;
 	$search_table->attach_defaults($search_o, 1, 2, 1, 2);
-	$tooltips->set_tip(
-		$search_o,
-		"Поиск ведётся по файлам, в которых\nПРИСУТСТВУЕТ ХОТЯ БЫ ОДИН\n" .
-		"из перечисленных здесь тэгов (разделённых запятыми)"
-	);
+	# $tooltips->set_tip(
+	# 	$search_o,
+	# 	"Поиск ведётся по файлам, в которых\nПРИСУТСТВУЕТ ХОТЯ БЫ ОДИН\n" .
+	# 	"из перечисленных здесь тэгов (разделённых запятыми)"
+	# );
 	$search_o->set_text($opts_v{o}) if exists $opts_v{o};
 	$search_o->signal_connect(
 		drag_data_received => \&entry_drag_data_received, $treeview
 	);
 
-	$search_n_l = Gtk2::Label->new("Нет ни одного тэга из:");
+	$search_n_l = Gtk3::Label->new("Нет ни одного тэга из:");
 	$search_n_l->set_alignment(1, 0.5);
 	$search_table->attach(
 		$search_n_l, 0, 1, 2, 3, ["shrink", "fill"], "fill", 0, 0
 	);
 
-	$search_n = Gtk2::Entry->new;
+	$search_n = Gtk3::Entry->new;
 	$search_table->attach_defaults($search_n, 1, 2, 2, 3);
-	$tooltips->set_tip(
-		$search_n,
-		"Поиск ведётся по файлам, в которых\nНЕТ НИ ОДНОГО\n" .
-		"из перечисленных здесь тэгов (разделённых запятыми)"
-	);
+	# $tooltips->set_tip(
+	# 	$search_n,
+	# 	"Поиск ведётся по файлам, в которых\nНЕТ НИ ОДНОГО\n" .
+	# 	"из перечисленных здесь тэгов (разделённых запятыми)"
+	# );
 	$search_n->set_text($opts_v{n}) if exists $opts_v{n};
 	$search_n->signal_connect(
 		drag_data_received => \&entry_drag_data_received, $treeview
 	);
 
-	$action_frame = Gtk2::Frame->new(" Действия с найденным ");
+	$action_frame = Gtk3::Frame->new(" Действия с найденным ");
 	$vbox->pack_start($action_frame, FALSE, TRUE, 0);
 
-	$action_table = Gtk2::Table->new(3, 2, FALSE);
+	$action_table = Gtk3::Table->new(3, 2, FALSE);
 	$action_table->set_border_width(5);
 	$action_table->set_col_spacings(5);
 	$action_frame->add($action_table);
 
-	$action_i_l = Gtk2::Label->new("Добавить тэги в найденные файлы:");
+	$action_i_l = Gtk3::Label->new("Добавить тэги в найденные файлы:");
 	$action_i_l->set_alignment(1, 0.5);
 	$action_table->attach(
 		$action_i_l, 0, 1, 0, 1, ["shrink", "fill"], "fill", 0, 0
 	);
 
-	$action_i = Gtk2::Entry->new;
+	$action_i = Gtk3::Entry->new;
 	$action_table->attach_defaults($action_i, 1, 2, 0, 1);
-	$tooltips->set_tip(
-		$action_i,
-		"ДОБАВИТЬ в найденные файлы перечисленные здесь тэги " .
-		"(разделённые запятыми)"
-	);
+	# $tooltips->set_tip(
+	# 	$action_i,
+	# 	"ДОБАВИТЬ в найденные файлы перечисленные здесь тэги " .
+	# 	"(разделённые запятыми)"
+	# );
 	$action_i->set_text($opts_v{i}) if exists $opts_v{i};
 	$action_i->signal_connect
 		(drag_data_received => \&entry_drag_data_received, $treeview
 	);
 
-	$action_d_l = Gtk2::Label->new("Удалить тэги из найденных файлов:");
+	$action_d_l = Gtk3::Label->new("Удалить тэги из найденных файлов:");
 	$action_d_l->set_alignment(1, 0.5);
 	$action_table->attach(
 		$action_d_l, 0, 1, 1, 2, ["shrink", "fill"], "fill", 0, 0
 	);
 
-	$action_d = Gtk2::Entry->new;
+	$action_d = Gtk3::Entry->new;
 	$action_table->attach_defaults($action_d, 1, 2, 1, 2);
-	$tooltips->set_tip(
-		$action_d,
-		"УДАЛИТЬ из найденных файлов перечисленные здесь тэги " .
-		"(разделённые запятыми)"
-	);
+	# $tooltips->set_tip(
+	# 	$action_d,
+	# 	"УДАЛИТЬ из найденных файлов перечисленные здесь тэги " .
+	# 	"(разделённые запятыми)"
+	# );
 	$action_d->set_text($opts_v{d}) if exists $opts_v{d};
 	$action_d->signal_connect(
 		drag_data_received => \&entry_drag_data_received, $treeview
 	);
 
-	$action_c_l = Gtk2::Label->new("Заменить тэги в найденных файлах:");
+	$action_c_l = Gtk3::Label->new("Заменить тэги в найденных файлах:");
 	$action_c_l->set_alignment(1, 0.5);
 	$action_table->attach(
 		$action_c_l, 0, 1, 2, 3, ["shrink", "fill"], "fill", 0, 0
 	);
 
-	$action_c = Gtk2::Entry->new;
+	$action_c = Gtk3::Entry->new;
 	$action_table->attach_defaults($action_c, 1, 2, 2, 3);
-	$tooltips->set_tip(
-		$action_c,
-		"ЗАМЕНИТЬ в найденных файлах одни тэги на другие. Тэги перечисляются " .
-		"в этом поле попарно через запятые. Например, если ввести в это поле " .
-		"[овсянка, борщ, лада калина, мотоцикл], то в найденных файлах " .
-		"тэг «овсянка» заменится на «борщ», а тэг «лада калина» заменится " .
-		"на «мотоцикл»."
-	);
+	# $tooltips->set_tip(
+	# 	$action_c,
+	# 	"ЗАМЕНИТЬ в найденных файлах одни тэги на другие. Тэги перечисляются " .
+	# 	"в этом поле попарно через запятые. Например, если ввести в это поле " .
+	# 	"[овсянка, борщ, лада калина, мотоцикл], то в найденных файлах " .
+	# 	"тэг «овсянка» заменится на «борщ», а тэг «лада калина» заменится " .
+	# 	"на «мотоцикл»."
+	# );
 	$action_c->set_text($opts_v{c}) if exists $opts_v{c};
 	$action_c->signal_connect(
 		drag_data_received => \&entry_drag_data_received, $treeview
 	);
 
-	$hbox2 = Gtk2::HBox->new(FALSE, 5);
+	$hbox2 = Gtk3::HBox->new(FALSE, 5);
 	$vbox->pack_end($hbox2, FALSE, TRUE, 0);
 
-	$begin_savecb = Gtk2::CheckButton->new("Сохранять ссылки в:");
+	$begin_savecb = Gtk3::CheckButton->new("Сохранять ссылки в:");
 	$begin_savecb->signal_connect(toggled => sub {
 		$begin_savefc->set_sensitive($begin_savecb->get_active);
 		$begin_keepcb->set_sensitive($begin_savecb->get_active);
 	});
 	$hbox2->pack_start($begin_savecb, FALSE, FALSE, 0);
-	$tooltips->set_tip(
-		$begin_savecb,
-		"Если отмечено, в выбранном правее каталоге сохраняются " .
-		"символические ссылки на найденные файлы. Это может быть удобно " .
-		"для составления альбомов."
-	);
-	$begin_savefc = Gtk2::FileChooserButton->new(
+	# $tooltips->set_tip(
+	# 	$begin_savecb,
+	# 	"Если отмечено, в выбранном правее каталоге сохраняются " .
+	# 	"символические ссылки на найденные файлы. Это может быть удобно " .
+	# 	"для составления альбомов."
+	# );
+	$begin_savefc = Gtk3::FileChooserButton->new(
 		"Сохранять ссылки в…", "select-folder"
 	);
 	$begin_savefc->set_sensitive(FALSE);
 	$hbox2->pack_start($begin_savefc, FALSE, FALSE, 0);
-	$tooltips->set_tip(
-		$begin_savefc,
-		"Каталог, в котором сохраняются " .
-		"символические ссылки на найденные файлы."
-	);
+	# $tooltips->set_tip(
+	# 	$begin_savefc,
+	# 	"Каталог, в котором сохраняются " .
+	# 	"символические ссылки на найденные файлы."
+	# );
 
-	$begin_keepcb = Gtk2::CheckButton->new("Сохранять имена");
+	$begin_keepcb = Gtk3::CheckButton->new("Сохранять имена");
 	$begin_keepcb->set_sensitive(FALSE);
 	$hbox2->pack_start($begin_keepcb, FALSE, FALSE, 0);
-	$tooltips->set_tip(
-		$begin_keepcb,
-		"Если отмечено, символические ссылки на найденные файлы сохраняются " .
-		"с именами самих файлов. В противном случае ссылки получают " .
-		"случайные имена. Ставьте эту галочку только если уверены, " .
-		"что все найденные файлы имеют уникальные имена."
-	);
+	# $tooltips->set_tip(
+	# 	$begin_keepcb,
+	# 	"Если отмечено, символические ссылки на найденные файлы сохраняются " .
+	# 	"с именами самих файлов. В противном случае ссылки получают " .
+	# 	"случайные имена. Ставьте эту галочку только если уверены, " .
+	# 	"что все найденные файлы имеют уникальные имена."
+	# );
 
-	$begin_button = Gtk2::Button->new("Начать");
+	$begin_button = Gtk3::Button->new("Начать");
 	$begin_button->signal_connect(clicked => \&gtk_begin);
 	$hbox2->pack_end($begin_button, FALSE, FALSE, 0);
-	$tooltips->set_tip(
-		$begin_button,
-		"Начать поиск (и операции с найденными файлами, если они заданы). " .
-		"Поиск может продолжаться довольно долго, если происходит " .
-		"по большому количеству файлов."
-	);
+	# $tooltips->set_tip(
+	# 	$begin_button,
+	# 	"Начать поиск (и операции с найденными файлами, если они заданы). " .
+	# 	"Поиск может продолжаться довольно долго, если происходит " .
+	# 	"по большому количеству файлов."
+	# );
 
 	for(my $i = 0; $i < @dirs; $i++) {
 		&add_path($dirs[$i]);
@@ -714,7 +714,7 @@ sub gtk {
 		$begin_savefc->set_filename($opts_v{s});
 	}
 	$window->show_all;
-	Gtk2->main;
+	Gtk3->main;
 }
 
 getopts("hgka:o:n:i:d:c:l:s:t:e:", \%opts);
@@ -722,7 +722,7 @@ getopts("hgka:o:n:i:d:c:l:s:t:e:", \%opts);
 foreach(@dirs) {$_ = abs_path $_;}
 $opts{t} = $ENV{HOME} . "/.config/geeqie/geeqierc.xml" unless exists $opts{t};
 $opts{e} = "*" unless exists $opts{e};
-$opts{l} = "geeqie" unless exists $opts{l} and $opts{l} ne "no";
+$opts{l} = "/home/assador/sources/XnView_MP.appimage" unless exists $opts{l} and $opts{l} ne "no";
 %opts_v = %opts;
 die "\n" . HELP . "\n" if exists $opts_v{h};
 if(exists $opts_v{g}) {

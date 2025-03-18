@@ -1,0 +1,5 @@
+#!/bin/bash
+
+grim /media/data/Temp/grim_%Y_%m_%d_%H_%M_%S.png
+
+exit 0
