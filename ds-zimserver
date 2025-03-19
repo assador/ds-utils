@@ -1,8 +1,0 @@
-#!/bin/bash
-
-export DISPLAY=:0
-killall zim
-rm -f /tmp/zim-assador/daemon-socket
-zim --server /home/assador/notes &
-
-exit 0

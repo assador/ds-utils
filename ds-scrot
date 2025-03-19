@@ -1,5 +1,0 @@
-#!/bin/bash
-
-scrot /media/data/Temp/scrot_%Y_%m_%d_%H_%M_%S.png
-
-exit 0

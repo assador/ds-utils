@@ -1,6 +1,0 @@
-#!/bin/bash
-
-#sleep 3 && nvidia-settings -l && nvidia-settings -a [gpu:0]/GPUPowerMizerMode=1 && sleep 3 && compton -b
-sleep 3 && nvidia-settings -l && nvidia-settings -a [gpu:0]/GPUPowerMizerMode=1
-
-exit 0

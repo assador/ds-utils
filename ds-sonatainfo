@@ -1,5 +1,0 @@
-#!/bin/bash
-
-notify-send -t 7000 "`sonata info`"
-
-exit 0

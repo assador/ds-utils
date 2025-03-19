@@ -1,5 +1,0 @@
-#!/bin/bash
-
-xclip -o | xclip -selection clipboard &
-
-exit 0

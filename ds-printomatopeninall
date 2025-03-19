@@ -1,7 +1,0 @@
-#!/bin/bash
-
-for i in "$@"; do
-	geany "/mnt/sshfs/printdays_easy02$i" "/mnt/sshfs/printdays_easy03$i" "/mnt/sshfs/printdays_colorise$i" "/mnt/sshfs/printdays_expo112$i" "/mnt/sshfs/printdays_jagganath$i" "/mnt/sshfs/printdays_pikart$i" "/mnt/sshfs/printdays_printio$i" "/mnt/sshfs/printdays_printoline$i"
-done
-
-exit 0

@@ -1,9 +1,0 @@
-#!/bin/bash
-
-export DISPLAY=:0.0
-dir=/home/assador/.local/share/orage
-killall orage
-wget -T 5 -r -nH -nd -o $dir/wget.log -O $dir/orage.ics https://www.google.com/calendar/ical/assador@gmail.com/private-d27bbf2525af63c12cd1ce2e31581dac/basic.ics
-orage &
-
-exit 0
