@@ -1,0 +1,7 @@
+#!/bin/bash
+
+FILE1="/tmp/clp.saved"
+
+# xclip -o -selection primary > "$FILE1"
+wl-paste --primary > "$FILE1"
+notify-send "Diff" "Первый фрагмент сохранён"

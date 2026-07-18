@@ -9,8 +9,11 @@ use POSIX;
 use Getopt::Std;
 
 my %opts;
+getopts('lKB', \%opts);
+
 my $mode = 2;
 my $uselang = 0;
+my $linebreakmask = 'NxrsY39x6I1XIpksmyeLfQ8T0b3k1Va4gMhiRHAgiqhRh5OV1Jm3HEjLu3iAWOBh';
 my $skipstrings = '<!--.*?-->|<(applet|code|embed|iframe|noembed|object|plaintext|pre|samp|script|var|xmp)(?!\w)[^<>]*>.*?</\1>';
 my $tagstocut = "basefont|bgsound|big|blink|center|font|marquee|nobr|small|wbr";
 my $contenttocut = "head|link|meta|style|title";
@@ -25,8 +28,8 @@ my $source = "";
 my @skippedstrings = ();
 my @subst = ('hJpQe8ZyX3', 'es0uZUDcvD', 'vnkB1Ao8HD', 'SPIufTR806', 'oC1f45lrdI');
 my %symbols = (
-	'sInbsp' => "&nbsp;|&\\#160;|\N{U+00A0}|[\\s\N{U+0000}-\N{U+0020}]",
-	'sEnbsp' => "(?!&nbsp;|&\\#160;|\N{U+00A0})[\\s\N{U+0000}-\N{U+0020}]",
+	'sInbsp' => ($opts{'l'} ? "&nbsp;|&\\#160;|\N{U+00A0}|\\h" : "&nbsp;|&\\#160;|\N{U+00A0}|[\\s\N{U+0000}-\N{U+0020}]"),
+	'sEnbsp' => ($opts{'l'} ? "(?!\N{U+00A0})\\h" : "(?!\N{U+00A0})[\\s\N{U+0000}-\N{U+0020}]"),
 	'nbsp' => "\N{U+00A0}",				'nbsp_m' => "&nbsp;|&\\#160;|\N{U+00A0}",
 	'dash' => "\N{U+2014}",				'dash_m' => "-|&ndash;|&mdash;|\N{U+2013}|\N{U+2014}",
 										'quot_m' => "\"|\'\'|&quot;|&\\#34;|&\\#39;&\\#39;",
@@ -54,7 +57,6 @@ my @rep_init_k = (
 );
 
 my @sam_html = (
-#	"<(\\w+)[^<>]*>($symbols{'nbsp_m'}|\\s){0,}</\\1>",											# Удаление пустых тэгов
 	"</?(?:$tagstocut)(?!\\w)[^<>]*>",															# Удаление определённых тэгов
 #	"<($contenttocut)(?!\\w)[^<>]*>.*?</\\1>", "</?(?:$contenttocut)(?!\\w)[^<>]*>",			# Удаление определённых тэгов с контентом
 	"(\\s+)(?=[^\\s=]+\\s*=\\s*([\"\']).*?\\2)(?=[^<>]*?>)", "\\s+$subst[0](?!(?:$attrtoleave)\\s*=).*?(?=\\s+$subst[0]|\\s*/*>)", "$subst[0]",	# Удаление аттрибутов тэгов
@@ -63,7 +65,6 @@ my @sam_html = (
 	"<($tagss)(?!\\w)((?:[^/]|/(?!>))*?)\\s*>",													# Добавление слэша в конец одинарного тэга
 );
 my @rep_html = (
-#	'',																							# Удаление пустых тэгов
 	'',																							# Удаление определённых тэгов
 #	'', '',																						# Удаление определённых тэгов с контентом
 	"\$1$subst[0]", '', '',																		# Удаление аттрибутов тэгов
@@ -73,7 +74,7 @@ my @rep_html = (
 
 my @sam_text = (
 #	'([^<>\s]+)-(?![^<>]*?>)([^<>\s]+)',														# Неразрываемость написанного через дефисы
-	"(?:\\s|$symbols{'nbsp_m'})(?:$symbols{'dash_m'})(?![^<>]*?>)(?:\\s|$symbols{'nbsp_m'})",	# Замена "тирешных" дефисов на тире
+	"(?:\\h|$symbols{'nbsp_m'})(?:$symbols{'dash_m'})(?![^<>]*?>)(?:\\s|$symbols{'nbsp_m'})",	# Замена "тирешных" дефисов на тире
 );
 my @rep_text = (
 #	'<span style=\"white-space: nowrap;\">$1-$2</span>',										# Неразрываемость написанного через дефисы
@@ -91,7 +92,7 @@ sub setent {																					# Применение общих фильтр�
 	my $text = shift;
 	my $ret = $text;
 	my $pos;
-	for(my $c = 0; $c < scalar @sample; $c++) {
+	for (my $c = 0; $c < scalar @sample; $c++) {
 		$text = $ret;
 		$ret = "";
 		$pos = 0;
@@ -100,7 +101,7 @@ sub setent {																					# Применение общих фильтр�
 		$s =~ s/\\(\d+)/'\\'.($1+1)/ge;
 		$r =~ s/\$(\d+)/'".$'.($1+1).'."'/ge;
 		$r = '"'.$r.'"';
-		while($text =~ m/(.*?)$s/gsmix) {
+		while ($text =~ m/(.*?)$s/gsmix) {
 			$pos = pos($text);
 			$ret .= $1 . (eval $r);
 		}
@@ -113,7 +114,7 @@ sub quotations {																				# Расстановка кавычек
 	$text =~ s/(\w[[:punct:]]*(?:<[^<>]*?>){0,})(?:$symbols{'quot_m'})(?![^<>]*?>)($|[\s[:punct:]])/$1$subst[0]$2/gs;			# Закрывающие дюймы
 	$text =~ s/(^|\s|>|\(|$symbols{'nbsp_m'})(?:$symbols{'quot_m'})(?![^<>]*?>)(?=(?:<[^<>]*?>){0,}[а-яА-ЯёЁ])/$1$subst[1]/gs;	# Открывающие дюймы перед кириллицей
 	$text =~ s/(^|\s|>|\(|$symbols{'nbsp_m'})(?:$symbols{'quot_m'})(?![^<>]*?>)(?=(?:<[^<>]*?>){0,}\w)/$1$subst[2]/gs;			# Открывающие дюймы перед остальными
-	while($text =~ m/$subst[0]|$subst[1]|$subst[2]/gsx) {
+	while ($text =~ m/$subst[0]|$subst[1]|$subst[2]/gsx) {
 		$text =~ s/$subst[1]((?:(?!$subst[1]|$subst[2]).)*?)$subst[0]/$symbols{'laquo'}$1$symbols{'raquo'}/gs;
 		$text =~ s/$subst[2]((?:(?!$subst[1]|$subst[2]).)*?)$subst[0]/$symbols{'ldquo'}$1$symbols{'rdquo'}/gs;
 	}
@@ -130,17 +131,21 @@ sub cuttocontent {																				# Обрезание до контента
 	$text =~ s/<\/body>.*//is;
 	return $text;
 }
-sub lowercasehtml {																				# Перевод тэгов в нижний регистр
+sub masklinebreaks {
 	my $text = shift;
-	$text =~ s/(<\/?\w+)/\L$1/gsm;
-	$text =~ s/(?=[^<>]*?>)(?<!=)(\s+)(?![^=]*?[\"\'])(?![=\"\']|\s*\/*>)(\w+)/$1\L$2/gsm;
+	$text =~ s/\n/$linebreakmask/g;
+	return $text;
+}
+sub unmasklinebreaks {
+	my $text = shift;
+	$text =~ s/$linebreakmask/\n/g;
 	return $text;
 }
 sub fixbr {																						# Удаление лишних и перевод двойных br в p
 	my $text = shift;
 	my $tagsbwobr = "blockquote|center|div|dl|form|h1|h2|h3|h4|h5|h6|ol|p|table|ul";
 	my $brs = "(?:<br(?!\\w)[^<>]*?>\\s*?){2,}";
-	while($text =~ m/$brs/gis) {
+	while ($text =~ m/$brs/gis) {
 		$text =~ s/(?:^|(<\/?($tagsbwobr)(?!\w)[^<>]*?>))((?:[^<]|<(?!\/?(?:$tagsbwobr)(?!\w)[^<>]*?>))+?)$brs(.*?)(?=(?:$|<\/?($tagsbwobr)(?!\w)[^<>]*?>))/$1<p>$3<\/p><p>$4<\/p>/gis;
 	}
 	$text =~ s/(<p(?!\w)[^<>]*?>\s*?){2,}/$1/gis;
@@ -151,23 +156,22 @@ sub fixbr {																						# Удаление лишних и перево
 }
 sub headtables {																				# Поставить заголовки в беззаголовочных таблицах
 	my $text = shift;
-	while($text =~ s/(<table(?!\w)[^<>]*>)((?:[^<]|<(?!\/tr>))+?)td(?!\w)([^<>]*>)/$1$2th$3/gis) {}
+	while ($text =~ s/(<table(?!\w)[^<>]*>)((?:[^<]|<(?!\/tr>))+?)td(?!\w)([^<>]*>)/$1$2th$3/gis) {}
 	return $text;
 }
 sub excludeskipping {
 	my $text = shift;
-	while($text =~ s/($skipstrings)/push(@skippedstrings, $1); $subst[3] . scalar(scalar(@skippedstrings) - 1) . $subst[4]/gsmiex) {}
+	while ($text =~ s/($skipstrings)/push(@skippedstrings, $1); $subst[3] . scalar(scalar(@skippedstrings) - 1) . $subst[4]/gsmiex) {}
 	return $text;
 }
 sub includeskipping {
 	my $text = shift;
-	while($text =~ s/$subst[3](\d+)$subst[4]/$skippedstrings[$1]/gsmie) {}
+	while ($text =~ s/$subst[3](\d+)$subst[4]/$skippedstrings[$1]/gsmie) {}
 	@skippedstrings = ();
 	return $text;
 }
 
-getopts('KB', \%opts);
-unless(exists $opts{'B'}) {
+unless (exists $opts{'B'}) {
 	push(@sam_text, "\\s+(бы?|же?|ли|ль)(?!\\w)");
 	push(@sam_text, "(?<=\\d)\\s+(\\w{1,4}\\.)");
 	push(@sam_text, "(?<![^\\s|>])((?:(?![-’<>])[[:punct:]]){0,}(?:\\d{1,4}|(?!бы?|же?|ли|ль)\\w{1,2}))\\s+(?=\\w)");
@@ -175,24 +179,25 @@ unless(exists $opts{'B'}) {
 	push(@rep_text, "$symbols{'nbsp'}\$1");
 	push(@rep_text, "\$1$symbols{'nbsp'}");
 }
-while(<STDIN>) {$source .= $_;}
+while (<STDIN>) {$source .= $_;}
 $source = &excludeskipping($source);
-if($mode == 1) {
-		unless(exists $opts{'K'}) {@sample = @sam_init; @replace = @rep_init;} else {@sample = @sam_init_k; @replace = @rep_init_k;} $source = &setent($source);
-		@sample = @sam_text; @replace = @rep_text; $source = &setent($source);
-		@sample = @sam_textonly; @replace = @rep_textonly; $source = &setent($source);
-		$source = &quotations($source);
+$source =~ s/^\h+|\h+$//gm;
+if ($mode == 1) {
+	unless (exists $opts{'K'}) {@sample = @sam_init; @replace = @rep_init;} else {@sample = @sam_init_k; @replace = @rep_init_k;} $source = &setent($source);
+	@sample = @sam_text; @replace = @rep_text; $source = &setent($source);
+	@sample = @sam_textonly; @replace = @rep_textonly; $source = &setent($source);
+	$source = &quotations($source);
 }
-if($mode == 2) {
-#		$source = &cuttocontent($source);
-		unless(exists $opts{'K'}) {@sample = @sam_init; @replace = @rep_init;} else {@sample = @sam_init_k; @replace = @rep_init_k;} $source = &setent($source);
-		@sample = @sam_html; @replace = @rep_html; $source = &setent($source);
-		@sample = @sam_text; @replace = @rep_text; $source = &setent($source);
-		$source = &quotations($source);
-		$source = &lowercasehtml($source);
-		$source = &fixbr($source);
-#		$source = &headtables($source);
+if ($mode == 2) {
+#	$source = &cuttocontent($source);
+	unless (exists $opts{'K'}) {@sample = @sam_init; @replace = @rep_init;} else {@sample = @sam_init_k; @replace = @rep_init_k;} $source = &setent($source);
+	@sample = @sam_html; @replace = @rep_html; $source = &setent($source);
+	@sample = @sam_text; @replace = @rep_text; $source = &setent($source);
+	$source = &quotations($source);
+	$source = &fixbr($source);
+#	$source = &headtables($source);
 }
 $source = &includeskipping($source);
+$source =~ s/^\s+|\s+$//s;
 print $source;
 exit 0;

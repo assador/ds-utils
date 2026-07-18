@@ -1,0 +1,16 @@
+#!/bin/bash
+
+for pkg in $(pacman -Qdtq); do
+	# Находим первый попавшийся исполняемый файл пакета в /usr/bin
+	file=$(pacman -Ql "$pkg" | grep -E '/usr/bin/[^/]+$' | head -n 1 | awk '{print $2}')
+
+	if [ -n "$file" ] && [ -f "$file" ]; then
+		# Получаем дату последнего доступа в секундах и в читаемом формате
+		atime_sec=$(stat -c %X "$file")
+		atime_human=$(stat -c %X "$file" | xargs -I {} date -d "@{}" "+%Y-%m-%d %H:%M")
+		echo "$atime_sec|$atime_human|$pkg"
+	else
+		# Если у пакета нет бинарников в /usr/bin (например, это метапакет или библиотека)
+		echo "0|Никогда (нет бинарника)|$pkg"
+	fi
+done | sort -n | cut -d'|' -f2-

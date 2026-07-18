@@ -1,0 +1,16 @@
+#!/bin/bash
+
+FILE1="/tmp/clp.saved"
+FILE2=$(mktemp /tmp/clp.XXXXXX)
+
+trap 'rm -f "$FILE2"' EXIT
+
+# xclip -o -selection primary > "$FILE2"
+wl-paste --primary > "$FILE2"
+
+if [ ! -s "$FILE1" ] || [ ! -s "$FILE2" ]; then
+	notify-send "Ошибка" "Нет текста для сравнения"
+	exit 1
+fi
+
+meld "$FILE1" "$FILE2"
