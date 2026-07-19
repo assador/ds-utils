@@ -6,21 +6,74 @@ import argparse
 from gi.repository import GLib, Gio
 
 parser = argparse.ArgumentParser(
-    description="Wayland XDG-Portal Color Picker. Outputs the color in various CSS formats."
+    description="Wayland XDG-Portal Color Picker"
+)
+
+group_output = parser.add_argument_group("Standard output")
+parser.add_argument(
+    "-X", "--hex",
+    action="store_true", help="HEX to output",
 )
 parser.add_argument(
-    "-c", "--copy", 
-    action="store_true",
-    help="Also, copy the HEX value to the clipboard."
+    "-S", "--hsl",
+    action="store_true", help="HSL to output",
 )
+parser.add_argument(
+    "-B", "--rgb-bytes",
+    action="store_true", help="RGB (bytes) to output",
+)
+parser.add_argument(
+    "-P", "--rgb-percentages",
+    action="store_true", help="RGB (percentages) to output",
+)
+
+group_copy = parser.add_argument_group("Copy to clipboard")
+parser.add_argument(
+    "-x", "--copy-hex",
+    action="store_true", help="HEX to clipboard",
+)
+parser.add_argument(
+    "-s", "--copy-hsl",
+    action="store_true", help="HSL to clipboard",
+)
+parser.add_argument(
+    "-b", "--copy-rgb-bytes",
+    action="store_true", help="RGB (bytes) to clipboard",
+)
+parser.add_argument(
+    "-p", "--copy-rgb-percentages",
+    action="store_true", help="RGB (percentages) to clipboard",
+)
+
 args = parser.parse_args()
+
+args_output = [
+    args.hex,
+    args.hsl,
+    args.rgb_bytes,
+    args.rgb_percentages,
+]
+args_copy = [
+    args.copy_hex,
+    args.copy_hsl,
+    args.copy_rgb_bytes,
+    args.copy_rgb_percentages,
+]
 
 loop = GLib.MainLoop()
 channels = None
 
 bus = Gio.bus_get_sync(Gio.BusType.SESSION, None)
 
-def on_signal_received(connection, sender_name, object_path, interface_name, signal_name, parameters, user_data):
+def on_signal_received(
+    connection,
+    sender_name,
+    object_path,
+    interface_name,
+    signal_name,
+    parameters,
+    user_data,
+):
     global channels
     try:
         code, results = parameters.unpack()
@@ -44,7 +97,7 @@ def on_method_reply(connection, res):
             None,
             Gio.DBusSignalFlags.NONE,
             on_signal_received,
-            None
+            None,
         )
     except Exception as e:
         sys.stderr.write(f"Method error: {e}\n")
@@ -60,32 +113,57 @@ bus.call(
     Gio.DBusSignalFlags.NONE,
     -1,
     None,
-    on_method_reply
+    on_method_reply,
 )
 
 loop.run()
 
 if channels and len(channels) >= 3:
     r_f, g_f, b_f = channels[0], channels[1], channels[2]
-    
+
     r_b, g_b, b_b = int(r_f * 255), int(g_f * 255), int(b_f * 255)
-    hex_color = f"#{r_b:02x}{g_b:02x}{b_b:02x}"
     r_p, g_p, b_p = r_f * 100, g_f * 100, b_f * 100
     h_f, l_f, s_f = colorsys.rgb_to_hls(r_f, g_f, b_f)
     h, s, l = int(h_f * 360), int(s_f * 100), int(l_f * 100)
-    
-    print(f"HEX:  {hex_color}")
-    print(f"HSL:  hsl({h} {s}% {l}%)")
-    print(f"RGBb: rgb({r_b} {g_b} {b_b})")
-    print(f"RGBp: rgb({r_p:.1f}% {g_p:.1f}% {b_p:.1f}%)")
-    
-    if args.copy:
+
+    color_map = {
+        "hex": f"#{r_b:02x}{g_b:02x}{b_b:02x}",
+        "rgb_bytes": f"rgb({r_b} {g_b} {b_b})",
+        "rgb_percentages": f"rgb({r_p:.1f}% {g_p:.1f}% {b_p:.1f}%)",
+        "hsl": f"hsl({h} {s}% {l}%)",
+    }
+
+    if not any(args_output):
+        print("\n".join(color_map.values()))
+    else:
+        for key, value in color_map.items():
+            if getattr(args, key):
+                print(value)
+
+    if any(args_copy):
+        lines = []
+        for key, value in color_map.items():
+            if getattr(args, f"copy_{key}"):
+                lines.append(value)
+
+        output = "\n".join(lines)
+
         try:
-            subprocess.run(['wl-copy', hex_color], check=True, stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
+            subprocess.run(
+                ['wl-copy', output],
+                check=True,
+                stdout=subprocess.DEVNULL,
+                stderr=subprocess.DEVNULL,
+            )
         except Exception:
             try:
-                p = subprocess.Popen(['xclip', '-selection', 'clipboard'], stdin=subprocess.PIPE, stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
-                p.communicate(input=hex_color.encode())
+                p = subprocess.Popen(
+                    ['xclip', '-selection', 'clipboard'],
+                    stdin=subprocess.PIPE,
+                    stdout=subprocess.DEVNULL,
+                    stderr=subprocess.DEVNULL,
+                )
+                p.communicate(input=output.encode())
             except Exception:
                 pass
 
